@@ -1,5 +1,5 @@
 [package]
-name = "otc_escrow"
+name = "invoice_registry"
 type = "contract"
 authors = ["Jack Gilcrest", "Harsh Bajpai"]
 

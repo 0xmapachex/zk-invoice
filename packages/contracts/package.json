@@ -15,7 +15,7 @@
     "test": "bun run test:nr && bun test",
     "test:nr": "aztec test",
     "compile": "aztec-nargo compile && aztec-postprocess-contract",
-    "codegen": "aztec codegen target --outdir ts/src/artifacts/registry -f && rm ts/src/artifacts/registry/Token.ts",
+    "codegen": "aztec codegen target --outdir ts/src/artifacts/registry -f && rm -f ts/src/artifacts/registry/Token.ts",
     "copy-artifacts": "bun run scripts/add_artifacts.ts",
     "build": "bun run compile && bun run codegen && bun run copy-artifacts"
   },

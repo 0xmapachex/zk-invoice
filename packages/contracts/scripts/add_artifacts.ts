@@ -35,7 +35,7 @@ async function main() {
     console.log("Moving invoice registry artifacts...");
     // Move the invoice registry artifacts
     await copyFileWithLog(
-      "./target/otc_escrow-InvoiceRegistry.json",
+      "./target/invoice_registry-InvoiceRegistry.json",
       "./ts/src/artifacts/registry/InvoiceRegistry.json"
     );
 
@@ -43,7 +43,7 @@ async function main() {
     // Fix imports using string replacement instead of sed
     await replaceInFile(
       "./ts/src/artifacts/registry/InvoiceRegistry.ts",
-      "../../../../target/otc_escrow-InvoiceRegistry.json",
+      "../../../../target/invoice_registry-InvoiceRegistry.json",
       "./InvoiceRegistry.json"
     );
 
