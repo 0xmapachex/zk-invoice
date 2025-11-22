@@ -18,7 +18,6 @@ const deployments = deploymentsData as typeof deploymentsData & {
 };
 import {
   createInvoice as createInvoiceAPI,
-  ETH_SWAP_AMOUNT,
   getInvoiceAccounts,
   USDC_SWAP_AMOUNT,
   getTestnetSendWaitOptions,
@@ -55,9 +54,7 @@ const main = async () => {
     process.exit(1);
   }
 
-  // get tokens (ETH and USDC) - make sure PXE knows about them
-  const ethAddress = AztecAddress.fromString(deployments.eth.address);
-  const eth = await getTokenContract(wallet, senderAddress, node, ethAddress);
+  // get token (USDC) - make sure PXE knows about it
   const usdcAddress = AztecAddress.fromString(deployments.usdc.address);
   await getTokenContract(wallet, senderAddress, node, usdcAddress);
 

@@ -12,7 +12,7 @@ The invoice system uses a single shared Invoice Registry contract where all invo
 ## 🚀 Available Commands
 
 ### Setup Commands
-- `bun run setup:deploy`: Deploy token contracts (ETH, USDC)
+- `bun run setup:deploy`: Deploy token contract (USDC)
 - `bun run setup:mint`: Mint tokens to the payer account
 - `bun run setup:accounts`: Setup and configure accounts (testnet only)
 - `bun run deploy:registry`: Deploy the Invoice Registry contract (one-time)
@@ -101,7 +101,7 @@ bun run balances
 ## 📝 Command Details
 
 ### `bun run setup:deploy`
-- Deploys token contracts (ETH and USDC)
+- Deploys USDC token contract
 - Only needs to be run once per new sandbox instantiation
 - Saves deployment addresses to `scripts/data/deployments.json`
 
@@ -113,7 +113,7 @@ bun run balances
 
 ### `bun run setup:mint`
 - Mints tokens to the **payer** account
-- Mints 10 ETH and 50,000 USDC
+- Mints 50,000 USDC
 - **REQUIRED** before paying invoices
 - On localhost: Uses 3-second delays instead of block waiting
 - On testnet: Waits for block finalization
@@ -135,7 +135,7 @@ bun run balances
 
 ### `bun run balances`
 - Displays current token balances for sender and payer
-- Shows both ETH and USDC balances
+- Shows USDC balances
 - Useful for verifying successful payments
 
 ### `bun run invoice:check-db`

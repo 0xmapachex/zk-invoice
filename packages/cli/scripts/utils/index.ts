@@ -10,8 +10,6 @@ import type { AztecNode } from "@aztec/aztec.js/node";
 import { Fr } from "@aztec/aztec.js/fields";
 import type { PXEConfig } from "@aztec/pxe/config"
 
-export const ETH_MINT_AMOUNT = wad(10n);
-export const ETH_SWAP_AMOUNT = ETH_MINT_AMOUNT / 10n;
 export const USDC_MINT_AMOUNT = wad(50000n);
 export const USDC_SWAP_AMOUNT = USDC_MINT_AMOUNT / 10n;
 export const testnetBaseFeePadding = 100; // pad by 100%

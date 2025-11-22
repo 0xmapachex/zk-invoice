@@ -11,7 +11,7 @@ if (!L2_NODE_URL) {
     throw new Error("L2_NODE_URL is required. Please set it in .env file (see .env.example)");
 }
 
-// Deploys Ether and USD Coin token contracts
+// Deploys USD Coin token contract
 const main = async () => {
     const node = createAztecNodeClient(L2_NODE_URL);
     console.log("Connected to Aztec node at ", L2_NODE_URL);
@@ -25,16 +25,7 @@ const main = async () => {
 
      // if testnet, get send/ wait opts optimized for waiting and high gas
     const opts = await getTestnetSendWaitOptions(node, wallet, deployerAddress);
-    // deploy token contracts
-    console.log("Deploying Wrapped Ether token contract");
-    const eth = await deployTokenContract(
-        wallet,
-        deployerAddress,
-        TOKEN_METADATA.eth,
-        opts
-    );
-    console.log("Ether token contract deployed, address: ", eth.address);
-
+    // deploy token contract
     console.log("Deploying USD Coin token contract");
     const usdc = await deployTokenContract(
         wallet,
@@ -46,7 +37,6 @@ const main = async () => {
 
     // write deployment to fs
     const deployments = {
-        eth: { address: eth.address },
         usdc: { address: usdc.address }
     };
     // todo: add deployments for chainID

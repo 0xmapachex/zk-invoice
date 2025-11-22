@@ -70,20 +70,10 @@ const main = async () => {
         process.exit(1);
     }
 
-    // get token contract
+    // get token contract (USDC)
     const tokenAddress = AztecAddress.fromString(invoiceToPay.tokenAddress);
-    console.log("Setting up token contracts and syncing state...");
+    console.log("Setting up token contract and syncing state...");
     const token = await getTokenContract(wallet, payerAddress, node, tokenAddress);
-
-    // register other token (ETH or USDC) to ensure PXE knows about it
-    const ethAddress = AztecAddress.fromString(deployments.eth.address);
-    const usdcAddress = AztecAddress.fromString(deployments.usdc.address);
-    if (!tokenAddress.equals(ethAddress)) {
-        await getTokenContract(wallet, payerAddress, node, ethAddress);
-    }
-    if (!tokenAddress.equals(usdcAddress)) {
-        await getTokenContract(wallet, payerAddress, node, usdcAddress);
-    }
 
     // Check payer's balance before attempting payment
     console.log("Checking payer balance...");
