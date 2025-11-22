@@ -25,6 +25,7 @@ import {
 } from "./utils";
 import { createAztecNodeClient } from "@aztec/aztec.js/node";
 import { poseidon2Hash } from "@aztec/foundation/crypto";
+import { isTestnet } from "@zk-invoice/contracts/utils";
 
 // get environment variables
 const { L2_NODE_URL, API_URL } = process.env;
@@ -44,7 +45,9 @@ const main = async () => {
 
   // get accounts
   const node = await createAztecNodeClient(L2_NODE_URL);
-  const { wallet, senderAddress } = await getInvoiceAccounts(node);
+  let pxeConfig = {};
+  if (await isTestnet(node)) pxeConfig = { rollupVersion: 1667575857, proverEnabled: false };
+  const { wallet, senderAddress } = await getInvoiceAccounts(node, pxeConfig);
 
   // Check if registry is deployed
   if (!deployments.registry) {

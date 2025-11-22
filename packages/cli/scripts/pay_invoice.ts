@@ -26,6 +26,7 @@ import {
   waitForBlockFinalization,
 } from "./utils";
 import { createAztecNodeClient } from "@aztec/aztec.js/node";
+import { isTestnet } from "@zk-invoice/contracts/utils";
 
 // get environment variables
 const { L2_NODE_URL, API_URL } = process.env;
@@ -64,7 +65,9 @@ const main = async () => {
 
   // setup wallets
   const node = createAztecNodeClient(L2_NODE_URL);
-  const { wallet, payerAddress } = await getInvoiceAccounts(node);
+  let pxeConfig = {};
+  if (await isTestnet(node)) pxeConfig = { rollupVersion: 1667575857, proverEnabled: false };
+  const { wallet, payerAddress } = await getInvoiceAccounts(node, pxeConfig);
 
   // Check if registry is deployed
   if (!deployments.registry) {

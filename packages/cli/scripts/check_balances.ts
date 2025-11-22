@@ -4,6 +4,7 @@ import { usdc as usdcDeployment } from "./data/deployments.json"
 import { AztecAddress } from "@aztec/aztec.js/addresses";
 import { getTokenContract } from "@zk-invoice/contracts/contract";
 import { createAztecNodeClient } from "@aztec/aztec.js/node";
+import { isTestnet } from "@zk-invoice/contracts/utils";
 
 const { L2_NODE_URL } = process.env;
 if (!L2_NODE_URL) {
@@ -12,7 +13,9 @@ if (!L2_NODE_URL) {
 
 const main = async () => {
     const node = createAztecNodeClient(L2_NODE_URL);
-    const { wallet, senderAddress, payerAddress } = await getInvoiceAccounts(node);
+    let pxeConfig = {};
+    if (await isTestnet(node)) pxeConfig = { rollupVersion: 1667575857, proverEnabled: false };
+    const { wallet, senderAddress, payerAddress } = await getInvoiceAccounts(node, pxeConfig);
 
     // Get token contract
     const usdcAddress = AztecAddress.fromString(usdcDeployment.address);

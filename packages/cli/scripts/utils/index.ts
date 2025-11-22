@@ -8,7 +8,7 @@ import type { SendInteractionOptions, WaitOpts } from "@aztec/aztec.js/contracts
 import { AztecAddress } from "@aztec/stdlib/aztec-address";
 import type { AztecNode } from "@aztec/aztec.js/node";
 import { Fr } from "@aztec/aztec.js/fields";
-import type { PXEConfig } from "@aztec/pxe/config"
+import type { PXEConfig } from "@aztec/pxe/config";
 
 export const USDC_MINT_AMOUNT = wad(50000n);
 export const USDC_SWAP_AMOUNT = USDC_MINT_AMOUNT / 10n;
@@ -18,7 +18,9 @@ export const testnetTimeout = 3600; // seconds until timeout waiting for send
 export const testnetInterval = 3; // seconds between polling for tx
 /**
  * In high fee environments (testnet) get send and wait options
- * @param pxe - the PXE to execute with
+ * @param node - the Aztec node client
+ * @param wallet - the wallet to execute with
+ * @param from - the address to send from
  * @param withFPC - if true, use sponsored FPC
  * @returns send/ wait options optimized for testnet
  */
@@ -45,6 +47,9 @@ export const getTestnetSendWaitOptions = async (
     return { send, wait };
 }
 
+/**
+ * Get invoice accounts with a fresh PXE
+ */
 export const getInvoiceAccounts = async (
     node: AztecNode,
     pxeConfig: Partial<PXEConfig> = {}

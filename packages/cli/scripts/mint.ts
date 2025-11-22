@@ -42,10 +42,11 @@ const main = async () => {
         .wait(opts.wait);
     console.log("✅ 50,000 USDC minted to payer");
     
-    // On testnet, wait for finalization. On sandbox, tokens are immediately available
+    // On testnet, wait for finalization. On sandbox, no wait needed (pay script will sync)
     if (!L2_NODE_URL.includes('localhost')) {
         await waitForBlockFinalization(node, usdcReceipt.blockNumber!, 2, 3000, 60, wallet, senderAddress);
     }
+    // Note: Sandbox doesn't need a fixed delay here - the pay script will sync properly
     
     console.log("\n✨ Payer now has funds to pay invoices in USDC!");
     console.log("   Sender will receive payments when invoices are paid.");
