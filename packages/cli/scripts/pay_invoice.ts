@@ -146,16 +146,13 @@ const main = async () => {
             if (error?.message?.includes("Nullifier witness not found") && attempt < retries) {
                 console.log(`⚠️  Sync issue detected - PXE doesn't have witness data yet`);
                 
-                if (L2_NODE_URL.includes('localhost')) {
-                    console.log(`   Local sandbox - waiting 5s and resyncing...`);
-                    await new Promise(resolve => setTimeout(resolve, 5000));
-                } else {
+                if (!L2_NODE_URL.includes('localhost')) {
                     console.log(`   Waiting for more blocks to be processed...`);
                     const currentBlock = await node.getBlockNumber();
                     await waitForBlockFinalization(node, currentBlock, 2, 3000, 30, wallet, payerAddress);
                 }
                 
-                // Resync after wait
+                // Resync and retry
                 console.log(`   Resyncing private state...`);
                 await token.methods.sync_private_state().simulate({ from: payerAddress });
                 console.log(`   Retrying payment (attempt ${attempt + 1}/${retries})...\n`);
