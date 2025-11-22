@@ -1,7 +1,7 @@
-import type { Order } from "../types/api";
+import type { Invoice } from "../types/api";
 
 /**
- * Database interface for order operations
+ * Database interface for invoice operations
  * This interface can be implemented by different database providers (SQLite, PostgreSQL, etc.)
  */
 export interface IDatabase {
@@ -11,58 +11,44 @@ export interface IDatabase {
   initialize(): void;
 
   /**
-   * Check if an escrow address already exists
+   * Insert a new invoice into the database
    */
-  escrowAddressExists(escrowAddress: string): boolean;
+  insertInvoice(invoice: Invoice): Invoice;
 
   /**
-   * Insert a new order into the database
-   * @throws Error if escrow address already exists
+   * Get invoice by ID
    */
-  insertOrder(order: Order): Order;
+  getInvoiceById(invoiceId: string): Invoice | null;
 
   /**
-   * Get order by ID
+   * Get all invoices
    */
-  getOrderById(orderId: string): Order | null;
+  getAllInvoices(): Invoice[];
 
   /**
-   * Get order by escrow address
+   * Mark an invoice as paid
+   * @param invoiceId - the invoice ID to mark as paid
    */
-  getOrderByEscrowAddress(escrowAddress: string): Order | null;
+  markInvoicePaid(invoiceId: string): boolean;
 
   /**
-   * Get all orders
+   * Get invoices by token address
    */
-  getAllOrders(): Order[];
+  getInvoicesByToken(tokenAddress: string): Invoice[];
 
   /**
-   * Removes an order once it has been fulfilled
-   * @NOTE: needs authentication mechanism - probably checking for existence of nullifier
-   * @NOTE: should be able to either use escrow address or order id to close
-   * 
-   * @param orderId - the order ID to delete
+   * Get invoices by status
    */
-  closeOrder(orderId: string): boolean;
+  getInvoicesByStatus(status: 'pending' | 'paid'): Invoice[];
 
   /**
-   * Get orders by sell token address
+   * Get invoices with flexible filtering
    */
-  getOrdersBySellToken(sellTokenAddress: string): Order[];
-
-  /**
-   * Get orders by buy token address
-   */
-  getOrdersByBuyToken(buyTokenAddress: string): Order[];
-
-  /**
-   * Get orders with flexible filtering
-   */
-  getOrdersWithFilters(filters: {
-    escrowAddress?: string;
-    sellTokenAddress?: string;
-    buyTokenAddress?: string;
-  }): Order[];
+  getInvoicesWithFilters(filters: {
+    tokenAddress?: string;
+    status?: 'pending' | 'paid';
+    senderAddress?: string;
+  }): Invoice[];
 
   /**
    * Close database connection (if applicable)

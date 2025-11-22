@@ -2,4 +2,4 @@
  * Handler exports
  */
 
-export { createOrderHandlers } from "./orderHandlers";
+export { createInvoiceHandlers } from "./invoiceHandlers";

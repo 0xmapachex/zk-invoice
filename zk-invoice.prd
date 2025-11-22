@@ -1,0 +1,241 @@
+📄 PRD — ZK Invoice Platform
+
+A minimal, privacy-preserving invoice system using Aztec + Noir
+Author: raccoon
+
+1. Overview
+
+ZK Invoice Platform allows users to send invoices without exposing any personal information, including their receiving address.
+The payer sees only title, amount, chain, token and can pay directly.
+All sensitive data is encrypted client-side and validated with Noir zkProofs on Aztec.
+
+The invoice becomes cryptographically trustworthy without ever revealing identity.
+
+2. Core Value Proposition
+✔ Sender keeps full privacy
+
+Receiving address and personal details are never exposed.
+
+✔ Payer sees only what matters
+
+Title
+
+Amount
+
+Chain
+
+Token
+
+Pay button
+
+✔ Proofs validate correctness
+
+Without revealing sensitive fields.
+
+✔ Both parties get a cryptographic record
+
+Payment requested
+
+Payment completed
+
+
+3. Full Feature Flow
+3.1 Invoice Creation (Sender)
+User inputs:
+
+Public:
+
+title
+
+amount
+
+chain
+
+token
+
+Private:
+
+receiverAddress
+
+metadata (optional secret notes)
+
+Browser does:
+
+Generate invoiceId
+
+Create encryptedPayload (private fields only)
+
+Hash title → titleHash
+
+Run Noir → zkProof + commitment
+
+Sign with WebAuthn passkey
+
+POST to API:
+
+store encrypted payload
+
+call Aztec contract:
+
+submitInvoice(invoiceId, commitment, titleHash, descriptionHash, proof)
+
+Output:
+
+sender receives a URL:
+
+/invoice/[invoiceId]
+
+3.2 Invoice Viewing (Payer)
+
+When payer opens the link, UI shows:
+
+Title
+Amount
+Chain
+Token
+Pay Button
+Invoice Status
+
+
+No sender info.
+No receiving address.
+No metadata.
+
+Everything private stays fully hidden.
+
+3.3 Payment Flow
+
+User clicks “Pay”.
+
+Smart contract:
+
+Verifies invoice exists
+
+Checks proof + commitment
+
+Marks invoice as paid
+
+Transfers funds
+
+Emits event
+
+UI updates to “Paid”.
+
+3.4 Confirmation for Both Sides
+
+Both sender and payer can check:
+
+pending
+
+paid
+
+Status is read from the chain.
+
+4. Data Model
+Public fields stored on-chain
+invoiceId
+commitment
+titleHash
+paid (bool)
+
+Off-chain encrypted storage
+encryptedPayload (includes receiverAddress, metadata, etc.)
+
+Public view of invoice (to payer)
+title
+amount
+chain
+token
+status
+
+Private fields
+receiverAddress
+internalMetadata
+sender identity info (if stored)
+nullifier
+
+6. Noir Circuit (invoice_proof)
+Inputs
+
+Private:
+
+encryptedPayload
+
+receiverAddress
+
+amountPlain
+
+chainPlain
+
+tokenPlain
+
+titlePlain
+
+nullifier
+
+passkey signature
+
+Public:
+
+invoiceId
+
+amountHash
+
+chainHash
+
+tokenHash
+
+titleHash
+
+descriptionHash
+
+commitment
+
+Constraints
+hash(amountPlain) == amountHash
+hash(chainPlain) == chainHash
+hash(tokenPlain) == tokenHash
+hash(titlePlain) == titleHash
+hash(descriptionPlain) == descriptionHash
+
+commitment == hash(encryptedPayload)
+nullifier not used before
+
+
+Outputs:
+
+commitment
+
+masked public data
+
+nullifier
+
+5. Aztec Contract (minimal)
+contract Invoice {
+  
+  function submitInvoice(
+    invoiceId,
+    commitment,
+    titleHash,
+    descriptionHash,
+    proof
+  ) public {
+     verify(proof);
+     store(invoiceId → {
+        commitment,
+        titleHash,
+        descriptionHash,
+        paid: false
+     });
+  }
+
+  function payInvoice(invoiceId) public {
+     assert invoice exists
+     assert not paid
+     markPaid(invoiceId)
+     transfer funds
+  }
+}
+
+
+Smallest possible, easy to ship.

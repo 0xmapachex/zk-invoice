@@ -12,60 +12,191 @@ import { BaseWallet } from "@aztec/aztec.js/wallet";
 import { AuthWitness } from "@aztec/stdlib/auth-witness";
 import { deriveKeys } from "@aztec/stdlib/keys";
 import {
-    OTCEscrowContract,
-    OTCEscrowContractArtifact,
+    InvoiceRegistryContract,
+    InvoiceRegistryContractArtifact,
     TokenContract,
     TokenContractArtifact
 } from "./artifacts";
-import { type EscrowConfig } from "./constants";
 
 /**
- * Deploys a new instance of the OTC Escrow Contract
- * @dev ensures contract is built with known encryption keys and adds to deployer PXE
+ * Deploys a new instance of the Invoice Registry Contract (one-time deployment)
+ * @dev This contract handles all invoices, unlike OTC which deployed per-order
  * 
- * @param pxe - the PXE of the deploying account
- * @param deployer - the account deploying the OTC Escrow Contract (the maker)
- * @param sellTokenAddress - the address of the token being selled / sold by the maker
- * @param sellTokenAmount - quantity of sellToken the maker wants to sell
- * @param buyTokenAddress - the address of the token being buyed for/ bought by the maker
- * @param buyTokenAmount - quantity of buyToken the maker wants to buy
+ * @param wallet - the wallet of the deploying account
+ * @param from - the account deploying the Invoice Registry
  * @param opts - Aztec function send and wait options (optional)
  * @returns
- *          contract - the deployed OTC Escrow Contract
+ *          contract - the deployed Invoice Registry Contract
  *          secretKey - the master key for the contract
  */
-export async function deployEscrowContract(
+export async function deployInvoiceRegistry(
     wallet: BaseWallet,
     from: AztecAddress,
-    sellTokenAddress: AztecAddress,
-    sellTokenAmount: bigint,
-    buyTokenAddress: AztecAddress,
-    buyTokenAmount: bigint,
     opts: { send: SendInteractionOptions, wait?: WaitOpts } = { send: { from } }
-): Promise<{ contract: OTCEscrowContract, secretKey: Fr }> {
+): Promise<{ contract: InvoiceRegistryContract, secretKey: Fr }> {
     // get keys for contract
     const contractSecretKey = Fr.random();
     const contractPublicKeys = (await deriveKeys(contractSecretKey)).publicKeys;
+    
     // set up contract deployment tx
-    const contractDeployment = await OTCEscrowContract.deployWithPublicKeys(
+    const contractDeployment = await InvoiceRegistryContract.deployWithPublicKeys(
         contractPublicKeys,
-        wallet,
-        sellTokenAddress,
-        sellTokenAmount,
-        buyTokenAddress,
-        buyTokenAmount
+        wallet
     );
+    
     // add contract decryption keys to PXE
     const instance = await contractDeployment.getInstance();
-    await wallet.registerContract(instance, OTCEscrowContractArtifact, contractSecretKey);
+    await wallet.registerContract(instance, InvoiceRegistryContractArtifact, contractSecretKey);
+    
     // deploy contract
     const contract = await contractDeployment
         .send(opts.send)
         .deployed(opts.wait);
+    
     return {
-        contract: contract as OTCEscrowContract,
+        contract: contract as InvoiceRegistryContract,
         secretKey: contractSecretKey,
     };
+}
+
+/**
+ * Create a new invoice in the registry
+ * 
+ * @param wallet - the wallet to use
+ * @param from - the invoice sender (who will receive payment)
+ * @param registry - the invoice registry contract
+ * @param invoiceId - unique identifier for the invoice
+ * @param titleHash - hash of the invoice title
+ * @param tokenAddress - token to be paid
+ * @param amount - amount to be paid
+ * @param metadata - optional private metadata (Field)
+ * @param opts - Aztec function send and wait options (optional)
+ * @returns - the transaction hash of the invoice creation
+ */
+export async function createInvoice(
+    wallet: BaseWallet,
+    from: AztecAddress,
+    registry: InvoiceRegistryContract,
+    invoiceId: Fr,
+    titleHash: Fr,
+    tokenAddress: AztecAddress,
+    amount: bigint,
+    metadata: Fr,
+    opts: { send: SendInteractionOptions, wait?: WaitOpts } = { send: { from } }
+): Promise<TxHash> {
+    registry = registry.withWallet(wallet);
+    
+    const receipt = await registry
+        .methods
+        .create_invoice(invoiceId, titleHash, tokenAddress, amount, metadata)
+        .send(opts.send)
+        .wait(opts.wait);
+    
+    return receipt.txHash;
+}
+
+/**
+ * Pay an invoice by completing the partial note
+ * 
+ * @param wallet - the wallet to use
+ * @param from - the payer
+ * @param registry - the invoice registry contract
+ * @param invoiceId - the invoice to pay
+ * @param nonce - the nonce for authwit
+ * @param opts - Aztec function send and wait options (optional)
+ * @returns - the transaction hash of the payment
+ */
+export async function payInvoice(
+    wallet: BaseWallet,
+    from: AztecAddress,
+    registry: InvoiceRegistryContract,
+    invoiceId: Fr,
+    nonce: Fr,
+    opts: { send: SendInteractionOptions, wait?: WaitOpts } = { send: { from } }
+): Promise<TxHash> {
+    registry = registry.withWallet(wallet);
+    
+    // TODO: Create proper authwit for token transfer
+    // For now, just call pay_invoice with the nonce
+    const receipt = await registry
+        .methods
+        .pay_invoice(invoiceId, nonce)
+        .send(opts.send)
+        .wait(opts.wait);
+    
+    return receipt.txHash;
+}
+
+/**
+ * Check if an invoice has been paid
+ * 
+ * @param wallet - the wallet to use
+ * @param from - the account checking status
+ * @param registry - the invoice registry contract
+ * @param invoiceId - the invoice to check
+ * @param opts - simulation options
+ * @returns - true if paid, false otherwise
+ */
+export async function isInvoicePaid(
+    wallet: BaseWallet,
+    from: AztecAddress,
+    registry: InvoiceRegistryContract,
+    invoiceId: Fr,
+    opts: SimulateInteractionOptions = { from }
+): Promise<boolean> {
+    return await registry
+        .withWallet(wallet)
+        .methods
+        .is_paid(invoiceId)
+        .simulate(opts);
+}
+
+/**
+ * Get private invoice data (only sender with viewing keys can access)
+ * 
+ * @param wallet - the wallet to use (must have viewing keys)
+ * @param from - the account querying
+ * @param registry - the invoice registry contract
+ * @param invoiceId - the invoice to retrieve
+ * @param opts - simulation options
+ * @returns - the private invoice note
+ */
+export async function getInvoice(
+    wallet: BaseWallet,
+    from: AztecAddress,
+    registry: InvoiceRegistryContract,
+    invoiceId: Fr,
+    opts: SimulateInteractionOptions = { from }
+): Promise<any> {
+    return await registry
+        .withWallet(wallet)
+        .methods
+        .get_invoice(invoiceId)
+        .simulate(opts);
+}
+
+/**
+ * Get public payment info (anyone can access)
+ * 
+ * @param wallet - the wallet to use
+ * @param from - the account querying
+ * @param registry - the invoice registry contract
+ * @param invoiceId - the invoice to retrieve
+ * @param opts - simulation options
+ * @returns - the public payment information
+ */
+export async function getPaymentInfo(
+    wallet: BaseWallet,
+    from: AztecAddress,
+    registry: InvoiceRegistryContract,
+    invoiceId: Fr,
+    opts: SimulateInteractionOptions = { from }
+): Promise<any> {
+    return await registry
+        .withWallet(wallet)
+        .methods
+        .get_payment_info(invoiceId)
+        .simulate(opts);
 }
 
 /**
@@ -96,80 +227,8 @@ export async function deployTokenContract(
 }
 
 /**
- * Deposit tokens into the escrow contract so that the taker can fill the order
- * @param PXE - pxe to use to fetch events from
- * @param escrow - the escrow contract to deposit into
- * @param caller - the maker who is selling tokens
- * @param token - the contract instance of the token being sold by the maker
- * @param amount - the amount of tokens to transfer in
- * @param opts - Aztec function send and wait options (optional)
- * @returns - the transaction hash of the deposit transaction
+ * Helper function to create private transfer authwit
  */
-export async function depositToEscrow(
-    wallet: BaseWallet,
-    from: AztecAddress,
-    escrow: OTCEscrowContract,
-    token: TokenContract,
-    amount: bigint,
-    opts: { send: SendInteractionOptions, wait?: WaitOpts } = { send: { from } }
-): Promise<TxHash> {
-    escrow = escrow.withWallet(wallet);
-    // create authwit
-    const { nonce, authwit } = await getPrivateTransferAuthwit(
-        wallet,
-        from,
-        token,
-        escrow.address,
-        escrow.address,
-        amount,
-    );
-    // send transfer_in with authwit
-    const receipt = await escrow
-        .methods
-        .deposit_tokens(nonce)
-        .with({ authWitnesses: [authwit], })
-        .send(opts.send)
-        .wait(opts.wait);
-    return receipt.txHash;
-}
-
-/**
- * Deposit tokens into the escrow contract so that the taker can fill the order
- * @param escrow - the escrow contract to deposit into
- * @param caller - the taker who is buying tokens / filling the order
- * @param token - the contract instance of the token being bought by the maker (sold by the taker)
- * @param amount - the amount of tokens to transfer in
- * @param opts - Aztec function send and wait options (optional)
- * @returns - the transaction hash of the order fill transaction
- */
-export async function fillOTCOrder(
-    wallet: BaseWallet,
-    from: AztecAddress,
-    escrow: OTCEscrowContract,
-    token: TokenContract,
-    amount: bigint,
-    opts: { send: SendInteractionOptions, wait?: WaitOpts } = { send: { from } }
-): Promise<TxHash> {
-    escrow = escrow.withWallet(wallet);
-    // create authwit
-    const { nonce, authwit } = await getPrivateTransferAuthwit(
-        wallet,
-        from,
-        token,
-        escrow.address,
-        escrow.address,
-        amount,
-    );
-    // send transfer_in with authwit
-    const receipt = await escrow
-        .methods
-        .fill_order(nonce)
-        .with({ authWitnesses: [authwit] })
-        .send(opts.send)
-        .wait(opts.wait);
-    return receipt.txHash;
-}
-
 export async function getPrivateTransferAuthwit(
     wallet: BaseWallet,
     from: AztecAddress,
@@ -189,19 +248,6 @@ export async function getPrivateTransferAuthwit(
     // construct private authwit
     const authwit = await wallet.createAuthWit(from, { caller, call });
     return { authwit, nonce }
-}
-
-export async function getEscrowConfig(
-    wallet: BaseWallet,
-    from: AztecAddress,
-    escrow: OTCEscrowContract,
-    opts: SimulateInteractionOptions = { from }
-): Promise<EscrowConfig> {
-    return await escrow
-        .withWallet(wallet)
-        .methods
-        .get_config()
-        .simulate(opts);
 }
 
 /**
@@ -226,7 +272,9 @@ export async function expectBalancePrivate(
     return empiricalBalance === expectedBalance;
 }
 
-
+/**
+ * Get a token contract instance
+ */
 export const getTokenContract = async (
     wallet: BaseWallet,
     from: AztecAddress,
@@ -250,22 +298,25 @@ export const getTokenContract = async (
     return token;
 };
 
-export const getEscrowContract = async (
+/**
+ * Get an invoice registry contract instance
+ */
+export const getInvoiceRegistry = async (
     wallet: BaseWallet,
     from: AztecAddress,
-    escrowAddress: AztecAddress,
+    registryAddress: AztecAddress,
     contractInstance: ContractInstanceWithAddress,
-    escrowSecretKey: Fr,
-): Promise<OTCEscrowContract> => {
+    registrySecretKey: Fr,
+): Promise<InvoiceRegistryContract> => {
     // register contract with secret key
     await wallet.registerContract(
         contractInstance,
-        OTCEscrowContractArtifact,
-        escrowSecretKey
+        InvoiceRegistryContractArtifact,
+        registrySecretKey
     );
-    await wallet.registerSender(escrowAddress);
-    // return synced escrow contract
-    const escrow = await OTCEscrowContract.at(escrowAddress, wallet);
-    await escrow.methods.sync_private_state().simulate({ from });
-    return escrow;
+    await wallet.registerSender(registryAddress);
+    // return synced registry contract
+    const registry = await InvoiceRegistryContract.at(registryAddress, wallet);
+    await registry.methods.sync_private_state().simulate({ from });
+    return registry;
 };

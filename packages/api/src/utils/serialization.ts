@@ -1,21 +1,20 @@
-import type { Order } from "../types/api";
+import type { Invoice } from "../types/api";
 
 /**
- * Serialize an Order object by converting BigInt values to strings
+ * Serialize an Invoice object by converting BigInt values to strings
  */
-export function serializeOrder(order: Order): any {
+export function serializeInvoice(invoice: Invoice): any {
   return {
-    ...order,
-    sellTokenAmount: order.sellTokenAmount.toString(),
-    buyTokenAmount: order.buyTokenAmount.toString()
+    ...invoice,
+    amount: invoice.amount.toString()
   };
 }
 
 /**
- * Serialize an array of Order objects
+ * Serialize an array of Invoice objects
  */
-export function serializeOrders(orders: Order[]): any[] {
-  return orders.map(order => serializeOrder(order));
+export function serializeInvoices(invoices: Invoice[]): any[] {
+  return invoices.map(invoice => serializeInvoice(invoice));
 }
 
 /**

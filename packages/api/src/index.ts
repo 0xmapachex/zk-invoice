@@ -1,11 +1,11 @@
 
-import { createOrderHandlers } from "./handlers";
+import { createInvoiceHandlers } from "./handlers";
 import { SQLiteDatabase } from "./db";
 
 /**
- * Orderflow Service
+ * Invoice Service
  * 
- * A Bun-based HTTP server for handling order operations in ZK Invoice.
+ * A Bun-based HTTP server for handling invoice operations in ZK Invoice.
  */
 
 const main = async () => {
@@ -15,28 +15,31 @@ const main = async () => {
   
   // Create handlers with database dependency injection
   const {
-    handleCreateOrder,
-    handleGetOrder,
-    handleCloseOrder
-  } = createOrderHandlers(database);
+    handleCreateInvoice,
+    handleGetInvoice,
+    handleMarkPaid
+  } = createInvoiceHandlers(database);
   
   const server = Bun.serve({
     port: 3000,
     fetch(req) {
       const url = new URL(req.url);
       
-      // /order endpoint - handles POST, GET, DELETE
-      if (url.pathname === "/order") {
+      // /invoice endpoint - handles POST, GET
+      if (url.pathname === "/invoice") {
         switch (req.method) {
           case "POST":
-            return handleCreateOrder(req);
+            return handleCreateInvoice(req);
           case "GET":
-            return handleGetOrder(req);
-          case "DELETE":
-            return handleCloseOrder(req);
+            return handleGetInvoice(req);
           default:
             return new Response("Method Not Allowed", { status: 405 });
         }
+      }
+
+      // /invoice/paid endpoint - marks invoice as paid
+      if (url.pathname === "/invoice/paid" && req.method === "POST") {
+        return handleMarkPaid(req);
       }
 
       // healthcheck endpoint
@@ -49,7 +52,7 @@ const main = async () => {
     },
   });
 
-  console.log(`🚀 Orderflow Service running on http://localhost:${server.port}`);
+  console.log(`🚀 Invoice Service running on http://localhost:${server.port}`);
   
   // Graceful shutdown
   process.on('SIGINT', () => {

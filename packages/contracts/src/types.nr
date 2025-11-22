@@ -1,1 +1,1 @@
-pub(crate) mod config_note;
+pub(crate) mod invoice_note;
