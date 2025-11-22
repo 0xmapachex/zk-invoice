@@ -113,11 +113,8 @@ const main = async () => {
   );
   console.log(`✅ Invoice created on-chain, tx hash: ${txHash}\n`);
 
-  // Wait for transaction to be finalized before querying
-  if (L2_NODE_URL.includes('localhost')) {
-    console.log("⚠️  Local sandbox - waiting 3s for state to settle...");
-    await new Promise(resolve => setTimeout(resolve, 3000));
-  } else {
+  // On testnet, wait for finalization. On sandbox, partial commitment is immediately available
+  if (!L2_NODE_URL.includes('localhost')) {
     console.log("Waiting for transaction to finalize...");
     const txReceipt = await wallet.getTxReceipt(txHash);
     if (txReceipt) {

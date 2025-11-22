@@ -42,11 +42,8 @@ const main = async () => {
         .wait(opts.wait);
     console.log("✅ 50,000 USDC minted to payer");
     
-    // Wait for USDC mint to finalize
-    if (L2_NODE_URL.includes('localhost')) {
-        console.log("⚠️  Local sandbox - skipping block wait, using fixed delay");
-        await new Promise(resolve => setTimeout(resolve, 3000));
-    } else {
+    // On testnet, wait for finalization. On sandbox, tokens are immediately available
+    if (!L2_NODE_URL.includes('localhost')) {
         await waitForBlockFinalization(node, usdcReceipt.blockNumber!, 2, 3000, 60, wallet, senderAddress);
     }
     
