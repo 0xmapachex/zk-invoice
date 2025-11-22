@@ -9,27 +9,29 @@ import type { PXEConfig } from "@aztec/pxe/config";
 import { Fr } from "@aztec/aztec.js/fields";
 
 // get environment variables
-const {
-    MNEMONIC,
-    L1_RPC_URL,
-    L2_NODE_URL
-} = process.env;
-if (!MNEMONIC) {
-    throw new Error("MNEMONIC is not defined");
-}
-if (!L1_RPC_URL) {
-    throw new Error("L1_RPC_URL is not defined");
-}
+const { L2_NODE_URL } = process.env;
 if (!L2_NODE_URL) {
-    throw new Error("L2_NODE_URL is not defined");
+    throw new Error("L2_NODE_URL is required. Please set it in .env file (see .env.example)");
 }
 
-// Fund 2 accounts
+// Fund 2 accounts (TESTNET ONLY - For sandbox use pre-funded accounts!)
 const main = async () => {
     // Create Node & PXE Config Options
     const node = createAztecNodeClient(L2_NODE_URL);
+    
+    // Check if we're on testnet
+    const onTestnet = await isTestnet(node);
+    if (!onTestnet) {
+        console.error("\n❌ ERROR: This script is for TESTNET deployment only!");
+        console.log("\n💡 For local sandbox development:");
+        console.log("   1. Start: aztec start --sandbox");
+        console.log("   2. Skip this script (sandbox has pre-funded accounts)");
+        console.log("   3. Run: bun run setup:deploy\n");
+        process.exit(1);
+    }
+    
     let pxeConfig: Partial<PXEConfig> = {};
-    if (await isTestnet(node)) 
+    if (onTestnet) 
         pxeConfig = { rollupVersion: 1667575857, proverEnabled: false };
 
     // deploy seller account

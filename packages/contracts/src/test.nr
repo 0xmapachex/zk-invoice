@@ -1,2 +1,2 @@
 pub(crate) mod utils;
-pub mod escrow;
+pub(crate) mod invoice;

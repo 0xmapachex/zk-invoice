@@ -1,7 +1,7 @@
 import "dotenv/config";
 import {
     ETH_MINT_AMOUNT,
-    getOTCAccounts,
+    getInvoiceAccounts,
     USDC_MINT_AMOUNT,
     getTestnetSendWaitOptions
 } from "./utils";
@@ -12,47 +12,51 @@ import { createAztecNodeClient } from "@aztec/aztec.js/node";
 import { isTestnet } from "@zk-invoice/contracts/utils";
 
 const { L2_NODE_URL } = process.env;
-if (!L2_NODE_URL) throw new Error("L2_NODE_URL not set in env");
+if (!L2_NODE_URL) {
+    throw new Error("L2_NODE_URL is required. Please set it in .env file (see .env.example)");
+}
 
-// - Mints 1 Eth to Buyer of the OTC
-// - Mints 5000 USDC to Buyer of the OTC
+// Mints tokens to PAYER account for testing invoice payments
+// In a real invoice system, the payer needs tokens to pay invoices
 const main = async () => {
     const node = createAztecNodeClient(L2_NODE_URL);
 
     // get accounts
     let pxeConfig = {};
     if (await isTestnet(node)) pxeConfig = { rollupVersion: 1667575857, proverEnabled: false };
-    const { wallet, sellerAddress, buyerAddress } = await getOTCAccounts(node, pxeConfig);
-
-    // get eth token
-    const ethAddress = AztecAddress.fromString(ethDeployment.address);
-    const eth = await getTokenContract(wallet, sellerAddress, node, ethAddress);
+    const { wallet, senderAddress, payerAddress } = await getInvoiceAccounts(node, pxeConfig);
 
     // if testnet, get send/ wait opts optimized for waiting and high gas
-    const opts = await getTestnetSendWaitOptions(node, wallet, sellerAddress);
+    const opts = await getTestnetSendWaitOptions(node, wallet, senderAddress);
 
-    // mint eth
-    console.log("Minting eth to seller account");
+    // Mint ETH to payer (for paying ETH invoices)
+    const ethAddress = AztecAddress.fromString(ethDeployment.address);
+    const eth = await getTokenContract(wallet, senderAddress, node, ethAddress);
+    
+    console.log("Minting ETH to payer account (for paying invoices)...");
     await eth
         .withWallet(wallet)
         .methods
-        .mint_to_private(sellerAddress, ETH_MINT_AMOUNT)
+        .mint_to_private(payerAddress, ETH_MINT_AMOUNT)
         .send(opts.send)
         .wait(opts.wait);
-    console.log("10 eth minted to seller");
+    console.log("✅ 10 ETH minted to payer");
 
-    // get USDC token
+    // Mint USDC to payer (for paying USDC invoices)
     const usdcAddress = AztecAddress.fromString(usdcDeployment.address);
-    const usdc = await getTokenContract(wallet, sellerAddress, node, usdcAddress);
+    const usdc = await getTokenContract(wallet, senderAddress, node, usdcAddress);
 
-    console.log("Minting USDC to buyer account");
+    console.log("Minting USDC to payer account (for paying invoices)...");
     await usdc
         .withWallet(wallet)
         .methods
-        .mint_to_private(buyerAddress, USDC_MINT_AMOUNT)
+        .mint_to_private(payerAddress, USDC_MINT_AMOUNT)
         .send(opts.send)
         .wait(opts.wait);
-    console.log("50,000 USDC minted to buyer");
+    console.log("✅ 50,000 USDC minted to payer");
+    
+    console.log("\n✨ Payer now has funds to pay invoices in ETH or USDC!");
+    console.log("   Sender will receive payments when invoices are paid.");
 }
 
 main();

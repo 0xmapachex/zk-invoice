@@ -5,7 +5,7 @@ use aztec::{
     test::helpers::{test_environment::TestEnvironment, txe_oracles}
 };
 use token_contract::Token;
-use crate::OTCEscrow;
+use crate::InvoiceRegistry;
 
 // Token metadata
 pub global USDC_NAME: str<31> = "USD Coin\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n";
@@ -16,25 +16,22 @@ pub global ETH_NAME: str<31> = "Ether\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\
 pub global ETH_SYMBOL: str<31> = "ETH\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n";
 pub global ETH_DECIMALS: u8 = 18;
 
-pub global USDC_ESCROW_AMOUNT: u128 = (1000 * 10.pow_32(6)) as u128;
-pub global ETH_ESCROW_AMOUNT: u128 = (1 * 10.pow_32(18)) as u128;
-
-// pub global USDC_ESCROW_AMOUNT: u128 = 1;
-// pub global ETH_ESCROW_AMOUNT: u128 = 1;
+// Invoice amounts for testing
+pub global INVOICE_AMOUNT: u128 = (1 * 10.pow_32(18)) as u128;
+pub global USDC_AMOUNT: u128 = (1000 * 10.pow_32(6)) as u128;
 
 // Named structs for easy readability
 pub struct TestAccounts {
     pub minter: AztecAddress,
-    pub seller: AztecAddress,
-    pub buyer: AztecAddress,
+    pub sender: AztecAddress,
+    pub payer: AztecAddress,
     pub external: AztecAddress,
-    pub escrow_secret: Field
 }
 
 pub struct TestContracts {
     pub usdc: AztecAddress,
     pub eth: AztecAddress,
-    pub escrow: AztecAddress,
+    pub registry: AztecAddress,
 }
 
 /**
@@ -54,12 +51,11 @@ pub unconstrained fn setup(mint: bool) -> (
     // setup accounts
     let mut env = TestEnvironment::new();
     let accounts = setup_accounts::<4>(&mut env);
-    let mut test_accounts = TestAccounts {
+    let test_accounts = TestAccounts {
         minter: accounts[0],
-        seller: accounts[1],
-        buyer: accounts[2],
+        sender: accounts[1],
+        payer: accounts[2],
         external: accounts[3],
-        escrow_secret: 0
     };
 
     // deploy contracts
@@ -77,35 +73,33 @@ pub unconstrained fn setup(mint: bool) -> (
         ETH_SYMBOL,
         ETH_DECIMALS
     );
-    let (escrow, escrow_secret) = deploy_escrow_contract(
+    let registry = deploy_invoice_registry(
         &mut env,
-        test_accounts.seller,
-        usdc,
-        USDC_ESCROW_AMOUNT,
-        eth,
-        ETH_ESCROW_AMOUNT
+        test_accounts.minter
     );
+
     // mint to accounts
     if (mint) {
+        // Mint USDC to payer
         env.call_private(
             test_accounts.minter,
             Token::at(usdc).mint_to_private(
-                test_accounts.seller,
-                USDC_ESCROW_AMOUNT
+                test_accounts.payer,
+                USDC_AMOUNT
             )
         );
         
+        // Mint ETH to payer (who will pay invoices)
         env.call_private(
             test_accounts.minter,
             Token::at(eth).mint_to_private(
-                test_accounts.buyer,
-                ETH_ESCROW_AMOUNT
+                test_accounts.payer,
+                INVOICE_AMOUNT
             )
         );
     }
     // named contract struct 
-    let test_contracts = TestContracts { usdc, eth, escrow };
-    test_accounts.escrow_secret = escrow_secret;
+    let test_contracts = TestContracts { usdc, eth, registry };
 
     (&mut env, test_accounts, test_contracts)
 }
@@ -140,39 +134,11 @@ pub unconstrained fn deploy_token_contract(
         .with_public_initializer(owner, initializer_call_interface)
 }
 
-pub unconstrained fn deploy_escrow_contract(
+pub unconstrained fn deploy_invoice_registry(
     env: &mut TestEnvironment,
-    owner: AztecAddress,
-    sell_token_address: AztecAddress,
-    sell_token_amount: u128,
-    buy_token_address: AztecAddress,
-    buy_token_amount: u128
-) -> (AztecAddress, Field) {
-    // setup keys for escrow account
-    let escrow_secret = unsafe { random() };
-    let _ = txe_oracles::add_account(escrow_secret);
-
-    // deploy escrow contract
-    let initializer_call_interface = OTCEscrow::interface()
-        .constructor(
-            sell_token_address,
-            sell_token_amount,
-            buy_token_address,
-            buy_token_amount
-        );
-     // deploy escrow contract
-    let initializer_call_interface = OTCEscrow::interface()
-        .constructor(
-            sell_token_address,
-            sell_token_amount,
-            buy_token_address,
-            buy_token_amount
-        );
-    let mut contract_instance = env.deploy("OTCEscrow");
-
-    contract_instance.secret = escrow_secret;
-        
-    let contract_address = contract_instance.with_private_initializer(owner, initializer_call_interface);
-
-    (contract_address, escrow_secret)
+    owner: AztecAddress
+) -> AztecAddress {
+    // Deploy InvoiceRegistry contract (single instance for all invoices)
+    // No initializer needed - contract has no constructor
+    env.deploy("InvoiceRegistry").without_initializer()
 }

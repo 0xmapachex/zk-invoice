@@ -1,32 +1,31 @@
 # ZK Invoice
 
-A private over-the-counter (OTC) trading platform built on Aztec Network, designed to facilitate confidential and secure asset swaps between parties using zero-knowledge proofs. The platform enables private and secure peer-to-peer token swaps through smart contract escrows while ensuring transaction confidentiality and security.
-
-📖 **Read our detailed article explaining why we built this and how it works:** [https://x.com/bajpaiharsh244/status/1968996432855392747](https://x.com/bajpaiharsh244/status/1968996432855392747)
+A privacy-preserving invoice platform built on Aztec Network, enabling users to send and receive payments without exposing sensitive information. Create invoices, share a link, and receive payments—all while keeping your receiving address and personal details encrypted on-chain.
 
 ## 🏗️ Architecture Overview
 
-ZK Invoice is a monorepo containing three main packages that work together to provide a complete private OTC trading solution:
+ZK Invoice is a monorepo containing three main packages that work together to provide a complete private invoicing solution:
 
-- **📄 Contracts**: Aztec Noir smart contracts implementing core Invoice Desk functionality with private trading capabilities
-- **🖥️ CLI Demo**: Node.js/Bun-based command-line interface demonstrating the complete workflow from order creation to fulfillment
-- **🌐 Orderflow Service**: RESTful HTTP service for order management, discovery, and coordination between traders
+- **📄 Contracts**: Aztec Noir smart contracts with single InvoiceRegistry contract using hybrid storage (private + public)
+- **🖥️ CLI Demo**: Bun-based command-line interface demonstrating invoice creation and payment workflow
+- **🌐 Invoice API**: RESTful HTTP service for invoice management and status tracking
 
 ## 📦 Packages
 
 ### 1. 📄 Contracts (`packages/contracts`)
 
-Aztec Noir smart contracts implementing the core OTC escrow functionality.
+Aztec Noir smart contracts implementing the invoice registry with privacy-preserving features.
 
 **Key Features:**
-- **OTC Escrow Contract**: Secure escrow mechanism for token swaps
-- **Token Contract**: Standard token implementation for testing
-- **Private Transfers**: Leverages Aztec's privacy features
-- **Atomic Swaps**: Ensures both parties receive their tokens or the trade fails
+- **InvoiceRegistry Contract**: Single contract managing all invoices
+- **Hybrid Storage**: Private sender data (encrypted) + Public payment info (visible to payer)
+- **Partial Notes**: Payer completes note, funds go directly to sender (address hidden)
+- **Nullifier-Based**: Double-payment prevention using nullifier tree
+- **Event Emission**: Payment tracking via unencrypted logs
 
 **Smart Contracts:**
-- `OTCEscrowContract`: Main escrow contract that holds seller's tokens until buyer fulfills the order
-- `Token`: Standard token contract compatible with Aztec's privacy features
+- `InvoiceRegistry`: Main registry contract with `create_invoice` and `pay_invoice` methods
+- `Token`: Standard token contract (from aztec-standards) for testing payments
 
 **Usage:**
 ```bash
@@ -46,35 +45,46 @@ bun test
 bun run test
 ```
 
+**Privacy Architecture:**
+```
+┌─────────────────────┐
+│ Private Storage     │ ← Encrypted on-chain (sender address, metadata)
+│ (PrivateImmutable)  │   Only readable with viewing keys
+└─────────────────────┘
+
+┌─────────────────────┐
+│ Public Storage      │ ← Visible to all (partial note, token, amount)
+│ (PublicImmutable)   │   What payer needs to complete payment
+└─────────────────────┘
+```
+
 ### 2. 🖥️ CLI Demo (`packages/cli`)
 
-A command-line interface demonstrating the complete OTC trading workflow with two parties: a seller and a buyer.
+A command-line interface demonstrating the complete invoice workflow with two parties: a sender and a payer.
 
 **Demo Scenario:**
-- **Seller** (Wallet #0): Wants to sell 1 WETH for 5000 USDC
-- **Buyer** (Wallet #1): Wants to buy 1 WETH for 5000 USDC
+- **Sender** (Wallet #0): Creates invoice requesting 1000 USDC for services
+- **Payer** (Wallet #1): Receives invoice link and pays 1000 USDC
 
 **Available Commands:**
 - `bun run setup:deploy`: Deploy token contracts and mint initial balances
 - `bun run setup:mint`: Mint additional tokens to participants
-- `bun run setup:accounts`: Setup and configure trading accounts
-- `bun run order:create`: Create a new OTC escrow order (seller)
-- `bun run order:fill`: Fill an existing OTC escrow order (buyer)
+- `bun run setup:accounts`: Setup and configure accounts
+- `bun run deploy:registry`: Deploy InvoiceRegistry contract (one-time)
+- `bun run invoice:create`: Create a new invoice (sender)
+- `bun run invoice:pay`: Pay an existing invoice (payer)
 - `bun run balances`: Check token balances of all participants
 
 **Complete Workflow:**
 
-**⚠️ Prerequisites: Build contracts and make sure PXE's & Orderflow API are running in the background!**
+**⚠️ Prerequisites: Build contracts and make sure Aztec Sandbox & Invoice API are running!**
 
 ```bash
-# Run the PXE's and Orderflow API
-# Use a separate terminal (or add ` -d` to the end of the command!)
+# Terminal 1: Run Aztec Sandbox
+aztec start --sandbox
 
-# Sandbox PXE
-bun run sandbox
-
-# Testnet PXE
-bun run testnet
+# Terminal 2: Run Invoice API
+bun run api
 ```
 
 ```bash
@@ -89,84 +99,84 @@ cd -
 cd packages/cli
 
 # 0. Setup .env
-cat .env.example > .env # edit to the testnet values if using testnet!
+cp .env.example .env  # Edit if using testnet
 
-# 1. IF USING TESTNET, ADD ACCOUNT
-# TODO: TESTNET IS CURRENTLY DOWN AND NEED TO ADD FPC
+# 1. Setup environment (run once per sandbox session)
+bun run setup:deploy   # Deploy and mint tokens
+bun run setup:mint     # Mint additional tokens if needed
+bun run balances       # Check initial balances
 
-# 2. Setup environment (run once per sandbox session)
-bun run setup:deploy
-bun run setup:mint     # Mint tokens to trading accounts
-bun run balances       # Check balances after minting
+# 2. Deploy InvoiceRegistry (one-time per environment)
+bun run deploy:registry
 
-# 3. Create an OTC order (seller perspective)
-bun run order:create
+# 3. Create an invoice (sender perspective)
+bun run invoice:create
+# Output: Invoice ID and shareable URL
 
-# 4. Fill the order (buyer perspective)
-bun run order:fill
+# 4. Pay the invoice (payer perspective)
+bun run invoice:pay
+# Completes partial note, sender receives funds privately
 
 # 5. Check final balances
 bun run balances
 ```
 
-### 3. 🌐 Orderflow Service (`packages/api`)
+### 3. 🌐 Invoice API (`packages/api`)
 
-A RESTful HTTP service that provides order management and discovery capabilities, facilitating the creation, retrieval, and management of private OTC orders.
+A RESTful HTTP service for invoice management, tracking, and status updates.
 
 **Key Features:**
-- **Order Management**: Create, update, and manage private OTC orders with unique escrow addresses
-- **Order Discovery**: Query, filter, and search for existing orders by various parameters
-- **Private Order Coordination**: Facilitate secure communication between trading parties
-- **SQLite Database**: Persistent storage with pluggable architecture for scalability
-- **RESTful API**: Standard HTTP endpoints for seamless integration
+- **Invoice Management**: Create, retrieve, and track invoices
+- **Status Tracking**: Monitor payment status (pending/paid)
+- **Filtering**: Query invoices by token, status, or sender
+- **SQLite Database**: Persistent storage with pluggable architecture
+- **RESTful API**: Standard HTTP endpoints for integration
 
 **API Endpoints:**
 
-#### Create Order
+#### Create Invoice
 ```bash
-POST /order
+POST /invoice
 Content-Type: application/json
 
 {
-  "escrowAddress": "0x1234...",
-  "sellTokenAddress": "0x5678...",
-  "sellTokenAmount": "1000000000000000000",
-  "buyTokenAddress": "0x9abc...",
-  "buyTokenAmount": "2000000000000000000"
+  "senderAddress": "0x1234...",
+  "title": "Payment for Services",
+  "tokenAddress": "0x5678...",
+  "amount": "1000000000000000000",
+  "metadata": "Optional notes"
 }
 ```
 
-#### Get Orders
+#### Get Invoices
 ```bash
-# Get all orders
-GET /order
+# Get all invoices
+GET /invoice
 
-# Get specific order by ID
-GET /order?id=uuid-here
+# Get specific invoice by ID
+GET /invoice?id=invoice-id-here
 
-# Filter by escrow address
-GET /order?escrow_address=0x1234...
+# Filter by status
+GET /invoice?status=pending
+GET /invoice?status=paid
 
-# Filter by token addresses
-GET /order?sell_token_address=0x5678...
-GET /order?buy_token_address=0x9abc...
+# Filter by token address
+GET /invoice?token_address=0x5678...
+```
+
+#### Mark Invoice as Paid
+```bash
+POST /invoice/paid
+Content-Type: application/json
+
+{
+  "invoiceId": "invoice-id-here"
+}
 ```
 
 **Usage:**
-You can run the orderflow api in docker:
-```bash
-# Bundled service with sandbox node & 2 PXE's
-bun run sandbox
 
-# Bundled service with 2 PXE's connected to testnet
-bun run testnet
-
-# Run docker container directly
-docker build -t otc-orderflow-api ./packages/api
-docker run -p 3000:3000 -v $(pwd)/data:/data otc-orderflow-api
-```
-
-Or locally run it:
+Run the Invoice API locally:
 ```bash
 cd packages/api
 
@@ -180,6 +190,12 @@ bun test                 # All tests
 bun run test:db          # Database tests only
 bun run test:handlers    # API handler tests only
 bun run test:integration # Integration tests only
+```
+
+Or from root directory:
+```bash
+bun run api      # Production mode
+bun run api:dev  # Development mode with auto-reload
 ```
 
 ## 🚀 Quick Start

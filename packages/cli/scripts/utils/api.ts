@@ -2,145 +2,159 @@ import {
     ContractInstanceWithAddressSchema,
     type ContractInstanceWithAddress
 } from "@aztec/stdlib/contract";
-import { OTCEscrowContract } from "@zk-invoice/contracts/artifacts";
-import { getEscrowContract } from "@zk-invoice/contracts/contract";
-import type { Order } from "../../../api/src/types/api";
-import {
-    eth as ethDeployment,
-    usdc as usdcDeployment
-} from "../data/deployments.json"
-import type { OrderAPIResponse } from "./types";
+import { InvoiceRegistryContract } from "@zk-invoice/contracts/artifacts";
+import { getInvoiceRegistry } from "@zk-invoice/contracts/contract";
+import type { Invoice } from "../../../api/src/types/api";
+import type { InvoiceAPIResponse } from "./types";
 import { AztecAddress } from "@aztec/stdlib/aztec-address";
 import { Fr } from "@aztec/aztec.js/fields";
 import type { BaseWallet } from "@aztec/aztec.js/wallet";
 
 /**
- * Fetch orders from the API
- * @param apiUrl The base URL of the orderflow API
- * 
- * @returns Open orders fetched from the API
+ * Fetch invoices from the API
+ * @param apiUrl The base URL of the invoice API
+ * @param filters Optional filters (status, tokenAddress, etc.)
+ * @returns Invoices fetched from the API
  */
-export const getOrders = async (apiUrl: string): Promise<Order[]> => {
-    // get an order from the database
-    // do this first to fail if no order found
-    let orders: Order[];
+export const getInvoices = async (
+    apiUrl: string,
+    filters?: { status?: 'pending' | 'paid', tokenAddress?: string }
+): Promise<Invoice[]> => {
     try {
-        const fullURL = `${apiUrl}/order`
-            + `?buy_token_address=${usdcDeployment.address}`
-            + `&sell_token_address=${ethDeployment.address}`;
+        let fullURL = `${apiUrl}/invoice`;
+        const params = new URLSearchParams();
+        
+        if (filters?.status) {
+            params.append('status', filters.status);
+        }
+        if (filters?.tokenAddress) {
+            params.append('token_address', filters.tokenAddress);
+        }
+        
+        if (params.toString()) {
+            fullURL += `?${params.toString()}`;
+        }
+
         const res = await fetch(fullURL, { method: "GET" });
         if (!res.ok) {
-            throw new Error("Failed to fetch orders");
+            throw new Error("Failed to fetch invoices");
         }
-        try {
-            const data: OrderAPIResponse = await res.json() as OrderAPIResponse;
-            orders = data.data;
+        
+        const data: InvoiceAPIResponse = await res.json() as InvoiceAPIResponse;
+        return data.data;
         } catch (err) {
-            throw new Error("Error parsing orders from API: " + (err as Error).message);
-        }
-    } catch (err) {
-        throw new Error("Error fetching orders: " + (err as Error).message);
+        throw new Error("Error fetching invoices: " + (err as Error).message);
     }
-
-    if (orders.length === 0) {
-        throw new Error("No orders found");
-    }
-
-    return orders;
 }
 
 /**
- * Create a new order
- * @param escrowAddress The address of the escrow contract
- * @param contractInstance The contract instance to use
- * @param secretKey The secret key to use
- * @param partialaAddress The partial address to use
- * @param sellTokenAddress The address of the token to sell
- * @param sellTokenAmount The amount of the token to sell
- * @param buyTokenAddress The address of the token to buy
- * @param buyTokenAmount The amount of the token to buy
- * @param apiUrl The base URL of the orderflow API
+ * Get a specific invoice by ID
+ * @param invoiceId The ID of the invoice
+ * @param apiUrl The base URL of the invoice API
+ * @returns The invoice if found
  */
-export const createOrder = async (
-    escrowAddress: AztecAddress | string,
-    contractInstance: ContractInstanceWithAddress,
-    secretKey: Fr,
-    sellTokenAddress: AztecAddress | string,
-    sellTokenAmount: bigint,
-    buyTokenAddress: AztecAddress | string,
-    buyTokenAmount: bigint,
+export const getInvoiceById = async (
+    invoiceId: string,
+    apiUrl: string
+): Promise<Invoice | null> => {
+    try {
+        const fullURL = `${apiUrl}/invoice?id=${invoiceId}`;
+        const res = await fetch(fullURL, { method: "GET" });
+        if (!res.ok) {
+            return null;
+        }
+        
+        const data: InvoiceAPIResponse = await res.json() as InvoiceAPIResponse;
+        return data.data && data.data.length > 0 ? data.data[0] : null;
+    } catch (err) {
+        throw new Error("Error fetching invoice: " + (err as Error).message);
+    }
+}
+
+/**
+ * Create a new invoice
+ * @param invoiceId The ID of the invoice
+ * @param registryAddress The address of the registry contract
+ * @param senderAddress The address of the invoice sender
+ * @param partialNoteHash The partial note hash
+ * @param title The invoice title
+ * @param tokenAddress The address of the token
+ * @param amount The invoice amount
+ * @param metadata Optional metadata
+ * @param apiUrl The base URL of the invoice API
+ */
+export const createInvoice = async (
+    invoiceId: string,
+    registryAddress: AztecAddress | string,
+    senderAddress: AztecAddress | string,
+    partialNoteHash: string,
+    title: string,
+    tokenAddress: AztecAddress | string,
+    amount: bigint,
+    metadata: string | undefined,
     apiUrl: string
 ) => {
     // parse inputs
-    if (typeof escrowAddress === "string") {
-        escrowAddress = AztecAddress.fromString(escrowAddress);
+    if (typeof registryAddress !== "string") {
+        registryAddress = registryAddress.toString();
     }
-    if (typeof sellTokenAddress === "string") {
-        sellTokenAddress = AztecAddress.fromString(sellTokenAddress);
+    if (typeof senderAddress !== "string") {
+        senderAddress = senderAddress.toString();
     }
-    if (typeof buyTokenAddress === "string") {
-        buyTokenAddress = AztecAddress.fromString(buyTokenAddress);
+    if (typeof tokenAddress !== "string") {
+        tokenAddress = tokenAddress.toString();
     }
+    
     // build the request body
     const payload = {
-        escrowAddress: escrowAddress.toString(),
-        contractInstance: JSON.stringify(contractInstance),
-        secretKey: secretKey.toString(),
-        sellTokenAddress: sellTokenAddress.toString(),
-        sellTokenAmount: sellTokenAmount.toString(),
-        buyTokenAddress: buyTokenAddress.toString(),
-        buyTokenAmount: buyTokenAmount.toString()
-    }
+        invoiceId,
+        registryAddress,
+        senderAddress,
+        partialNoteHash,
+        title,
+        tokenAddress,
+        amount: amount.toString(),
+        metadata: metadata || undefined
+    };
 
-    // post request to add order to api
+    // post request to add invoice to API
     try {
-        const fullURL = `${apiUrl}/order`;
+        const fullURL = `${apiUrl}/invoice`;
         const res = await fetch(fullURL,
-            { method: "POST", body: JSON.stringify(payload) }
+            { 
+                method: "POST", 
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload) 
+            }
         );
         if (!res.ok) {
-            throw new Error("Failed to fetch health status");
+            const errorText = await res.text();
+            throw new Error(`Failed to create invoice: ${errorText}`);
         }
-        console.log("Order added to otc order service")
+        console.log("Invoice registered in API");
     } catch (err) {
-        throw new Error("Error creating order: " + (err as Error).message);
+        throw new Error("Error creating invoice: " + (err as Error).message);
     }
 }
 
 /**
- * Close an order once filled using the ID
- * 
- * @param id The ID of the order to close
- * @param apiUrl The base URL of the orderflow API
+ * Mark an invoice as paid
+ * @param invoiceId The ID of the invoice to mark as paid
+ * @param apiUrl The base URL of the invoice API
  */
-export const closeOrder = async (id: string, apiUrl: string) => {
+export const markInvoicePaid = async (invoiceId: string, apiUrl: string) => {
     try {
-        const fullURL = `${apiUrl}/order?id=${id}`;
-        const res = await fetch(fullURL, { method: "DELETE" });
+        const fullURL = `${apiUrl}/invoice/paid`;
+        const res = await fetch(fullURL, { 
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ invoiceId })
+        });
         if (!res.ok) {
-            throw new Error("Unknown error closing filled order");
+            throw new Error("Unknown error marking invoice as paid");
         }
-        console.log("Order closed in OTC order service")
+        console.log("Invoice marked as paid in API");
     } catch (err) {
-        throw new Error("Error closing order: " + (err as Error).message);
-    }
+        throw new Error("Error marking invoice as paid: " + (err as Error).message);
 }
-
-export const escrowInstanceFromOrder = async (
-    wallet: BaseWallet,
-    from: AztecAddress,
-    order: Order,
-): Promise<OTCEscrowContract> => {
-    const escrowContractInstance = ContractInstanceWithAddressSchema.parse(
-        JSON.parse(order.contractInstance)
-    );
-    const escrowSecretKey = Fr.fromString(order.secretKey);
-    const escrowAddress = AztecAddress.fromString(order.escrowAddress);
-    return await getEscrowContract(
-        wallet,
-        from,
-        escrowAddress,
-        escrowContractInstance,
-        escrowSecretKey,
-    );
 }

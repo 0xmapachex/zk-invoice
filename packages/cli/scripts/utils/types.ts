@@ -1,2 +1,2 @@
-import { type Order } from "../../../api/src/types/api";
-export type OrderAPIResponse = { success: boolean, message: string, data: Order[] };
+import { type Invoice } from "../../../api/src/types/api";
+export type InvoiceAPIResponse = { success: boolean, message: string, data: Invoice[] };

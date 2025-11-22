@@ -111,17 +111,29 @@ export async function payInvoice(
     from: AztecAddress,
     registry: InvoiceRegistryContract,
     invoiceId: Fr,
-    nonce: Fr,
+    partialNote: Fr,
+    token: TokenContract,
+    tokenAddress: AztecAddress,
+    amount: bigint,
     opts: { send: SendInteractionOptions, wait?: WaitOpts } = { send: { from } }
 ): Promise<TxHash> {
     registry = registry.withWallet(wallet);
     
-    // TODO: Create proper authwit for token transfer
-    // For now, just call pay_invoice with the nonce
+    // Create authwit for token transfer (authorize registry to spend payer's tokens)
+    const { authwit, nonce } = await getPrivateTransferToCommitmentAuthwit(
+        wallet,
+        from,
+        token,
+        registry.address,
+        partialNote,
+        amount
+    );
+    
+    // Call pay_invoice with authwit nonce (pass authwitness in send options)
     const receipt = await registry
         .methods
-        .pay_invoice(invoiceId, nonce)
-        .send(opts.send)
+        .pay_invoice(invoiceId, partialNote, tokenAddress, amount, nonce)
+        .send({ ...opts.send, authWitnesses: [authwit] })
         .wait(opts.wait);
     
     return receipt.txHash;
@@ -242,6 +254,30 @@ export async function getPrivateTransferAuthwit(
     const call = await token.withWallet(wallet).methods.transfer_private_to_private(
         from,
         to,
+        amount,
+        nonce,
+    ).getFunctionCall();
+    // construct private authwit
+    const authwit = await wallet.createAuthWit(from, { caller, call });
+    return { authwit, nonce }
+}
+
+/**
+ * Helper function to create authwit for transfer_private_to_commitment (for invoice payments)
+ */
+export async function getPrivateTransferToCommitmentAuthwit(
+    wallet: BaseWallet,
+    from: AztecAddress,
+    token: TokenContract,
+    caller: AztecAddress,
+    commitment: Fr,
+    amount: bigint,
+): Promise<{ authwit: AuthWitness, nonce: Fr }> {
+    // construct call data
+    const nonce = Fr.random();
+    const call = await token.withWallet(wallet).methods.transfer_private_to_commitment(
+        from,
+        commitment,
         amount,
         nonce,
     ).getFunctionCall();

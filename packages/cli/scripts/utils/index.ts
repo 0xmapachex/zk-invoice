@@ -47,37 +47,37 @@ export const getTestnetSendWaitOptions = async (
     return { send, wait };
 }
 
-export const getOTCAccounts = async (
+export const getInvoiceAccounts = async (
     node: AztecNode,
     pxeConfig: Partial<PXEConfig> = {}
 ): Promise<{
     wallet: TestWallet,
-    sellerAddress: AztecAddress,
-    buyerAddress: AztecAddress,
+    senderAddress: AztecAddress,
+    payerAddress: AztecAddress,
 }> => {
     // check if testnet
     let wallet = await TestWallet.create(node, pxeConfig);
-    let sellerAddress: AztecAddress;
-    let buyerAddress: AztecAddress;
+    let senderAddress: AztecAddress;
+    let payerAddress: AztecAddress;
     if (await isTestnet(node)) {
         // if testnet, get accounts from env (should run setup_accounts.ts first)
-        sellerAddress = await getAccountFromFs("seller", wallet);
-        buyerAddress = await getAccountFromFs("buyer", wallet);
+        senderAddress = await getAccountFromFs("seller", wallet);  // seller = invoice sender
+        payerAddress = await getAccountFromFs("buyer", wallet);     // buyer = invoice payer
     } else {
         // if sandbox, get initialized test accounts
-        const [sellerAccount, buyerAccount] = await getInitialTestAccountsData();
-        if (!sellerAccount) throw new Error("Seller/ Minter not found");
-        if (!buyerAccount) throw new Error("Buyer not found");
+        const [senderAccount, payerAccount] = await getInitialTestAccountsData();
+        if (!senderAccount) throw new Error("Sender account not found");
+        if (!payerAccount) throw new Error("Payer account not found");
         // create accounts
-        await wallet.createSchnorrAccount(sellerAccount.secret, sellerAccount.salt);
-        sellerAddress = sellerAccount.address;
-        await wallet.createSchnorrAccount(buyerAccount.secret, buyerAccount.salt);
-        buyerAddress = buyerAccount.address;
+        await wallet.createSchnorrAccount(senderAccount.secret, senderAccount.salt);
+        senderAddress = senderAccount.address;
+        await wallet.createSchnorrAccount(payerAccount.secret, payerAccount.salt);
+        payerAddress = payerAccount.address;
     }
-    // register accounts to eachother
-    await wallet.registerSender(buyerAddress);
-    await wallet.registerSender(sellerAddress);
-    return { wallet, sellerAddress, buyerAddress };
+    // register accounts to each other
+    await wallet.registerSender(payerAddress);
+    await wallet.registerSender(senderAddress);
+    return { wallet, senderAddress, payerAddress };
 }
 
 export const getAccountFromFs = async (

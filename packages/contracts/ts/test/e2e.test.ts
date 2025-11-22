@@ -4,42 +4,41 @@ import { AztecAddress } from '@aztec/aztec.js/addresses';
 import { Fr } from '@aztec/aztec.js/fields';
 import { createAztecNodeClient, type AztecNode } from "@aztec/aztec.js/node";
 import { TestWallet } from '@aztec/test-wallet/server';
-import { OTCEscrowContract, TokenContract } from "@zk-invoice/contracts/artifacts";
+import { InvoiceRegistryContract, TokenContract } from "@zk-invoice/contracts/artifacts";
 import { TOKEN_METADATA } from "@zk-invoice/contracts/constants";
 import {
-    deployEscrowContract,
+    deployInvoiceRegistry,
     deployTokenContract,
-    depositToEscrow,
+    createInvoice,
+    payInvoice,
+    isInvoicePaid,
     expectBalancePrivate,
-    fillOTCOrder,
-    getEscrowConfig
+    getInvoice,
+    getPaymentInfo
 } from "@zk-invoice/contracts/contract";
 import { wad } from "@zk-invoice/contracts/utils";
 
 const { AZTEC_NODE_URL = "http://localhost:8080" } = process.env;
 
-describe("Private Transfer Demo Test", () => {
+describe("ZK Invoice E2E Tests", () => {
 
     let node: AztecNode;
 
     let minterWallet: TestWallet;
-    let sellerWallet: TestWallet;
-    let buyerWallet: TestWallet;
+    let senderWallet: TestWallet;
+    let payerWallet: TestWallet;
 
     let minterAddress: AztecAddress;
-    let sellerAddress: AztecAddress;
-    let buyerAddress: AztecAddress;
+    let senderAddress: AztecAddress;
+    let payerAddress: AztecAddress;
 
-    let escrowMasterKey: Fr;
-
-    let escrow: OTCEscrowContract;
+    let invoiceRegistry: InvoiceRegistryContract;
     let usdc: TokenContract;
     let eth: TokenContract;
 
-    const sellTokenAmount = wad(1000n, 6n);
-    const buyTokenAmount = wad(1n);
-    const sellerUSDCInitialBalance = wad(10000n, 6n);
-    const buyerETHInitialBalance = wad(4n);
+    const invoiceAmount = wad(1n); // 1 ETH
+    const senderETHInitialBalance = wad(0n); // Sender starts with 0 ETH (will receive payment)
+    const payerETHInitialBalance = wad(4n);  // Payer starts with 4 ETH
 
     beforeAll(async () => {
         // setup aztec node client
@@ -48,40 +47,48 @@ describe("Private Transfer Demo Test", () => {
 
         // setup wallets
         minterWallet = await TestWallet.create(node);
-        sellerWallet = await TestWallet.create(node);
-        buyerWallet = await TestWallet.create(node);
-        const [minterAccount, buyerAccount, sellerAccount] = await getInitialTestAccountsData();
+        senderWallet = await TestWallet.create(node);
+        payerWallet = await TestWallet.create(node);
+        const [minterAccount, payerAccount, senderAccount] = await getInitialTestAccountsData();
 
         await minterWallet.createSchnorrAccount(minterAccount.secret, minterAccount.salt);
         minterAddress = await minterWallet.getAccounts().then(accounts => accounts[0].item);
-        await sellerWallet.createSchnorrAccount(sellerAccount.secret, sellerAccount.salt);
-        sellerAddress = await sellerWallet.getAccounts().then(accounts => accounts[0].item);
-        await buyerWallet.createSchnorrAccount(buyerAccount.secret, buyerAccount.salt);
-        buyerAddress = await buyerWallet.getAccounts().then(accounts => accounts[0].item);
+        await senderWallet.createSchnorrAccount(senderAccount.secret, senderAccount.salt);
+        senderAddress = await senderWallet.getAccounts().then(accounts => accounts[0].item);
+        await payerWallet.createSchnorrAccount(payerAccount.secret, payerAccount.salt);
+        payerAddress = await payerWallet.getAccounts().then(accounts => accounts[0].item);
 
-        // connect accounts to eachother
-        await minterWallet.registerSender(sellerAddress);
-        await minterWallet.registerSender(buyerAddress);
-        await sellerWallet.registerSender(minterAddress);
-        await sellerWallet.registerSender(buyerAddress);
-        await buyerWallet.registerSender(minterAddress);
-        await buyerWallet.registerSender(sellerAddress);
+        // connect accounts to each other
+        await minterWallet.registerSender(senderAddress);
+        await minterWallet.registerSender(payerAddress);
+        await senderWallet.registerSender(minterAddress);
+        await senderWallet.registerSender(payerAddress);
+        await payerWallet.registerSender(minterAddress);
+        await payerWallet.registerSender(senderAddress);
 
         // deploy token contracts
         usdc = await deployTokenContract(minterWallet, minterAddress, TOKEN_METADATA.usdc);
         eth = await deployTokenContract(minterWallet, minterAddress, TOKEN_METADATA.eth);
 
-        // register token contracts in other wallets
-        await sellerWallet.registerContract(usdc);
-        await sellerWallet.registerContract(eth);
-        await buyerWallet.registerContract(usdc);
-        await buyerWallet.registerContract(eth);
+        // deploy InvoiceRegistry contract (single instance for all invoices)
+        ({ contract: invoiceRegistry } = await deployInvoiceRegistry(
+            minterWallet,
+            minterAddress
+        ));
 
-        // mint tokens
+        // register token contracts in other wallets
+        await senderWallet.registerContract(usdc);
+        await senderWallet.registerContract(eth);
+        await senderWallet.registerContract(invoiceRegistry);
+        await payerWallet.registerContract(usdc);
+        await payerWallet.registerContract(eth);
+        await payerWallet.registerContract(invoiceRegistry);
+
+        // mint tokens to payer
         await eth
             .withWallet(minterWallet)
             .methods.mint_to_private(
-                buyerAddress,
+                payerAddress,
                 wad(4n, 18n)
             )
             .send({ from: minterAddress })
@@ -89,114 +96,179 @@ describe("Private Transfer Demo Test", () => {
         await usdc
             .withWallet(minterWallet)
             .methods.mint_to_private(
-                sellerAddress,
+                payerAddress,
                 wad(10000n, 6n)
             )
             .send({ from: minterAddress })
             .wait();
     });
 
-    test("check escrow key leaking", async () => {
-        // deploy new escrow instance
-        ({ contract: escrow, secretKey: escrowMasterKey } = await deployEscrowContract(
-            sellerWallet,
-            sellerAddress,
-            usdc.address,
-            sellTokenAmount,
+    test("invoice privacy - only sender can read private details", async () => {
+        const invoiceId = Fr.random();
+        const titleHash = Fr.random(); // In production, would be hash of "Consulting Services"
+        const metadata = Fr.random(); // In production, would be encrypted
+
+        // Sender creates invoice
+        await createInvoice(
+            senderWallet,
+            senderAddress,
+            invoiceRegistry,
+            invoiceId,
+            titleHash,
             eth.address,
-            buyTokenAmount,
-        ));
+            invoiceAmount,
+            metadata
+        );
 
-        // Check seller Escrow
-        const sellerConfig = await getEscrowConfig(sellerWallet, sellerAddress, escrow);
-        expect(sellerConfig.owner).toEqual(escrow.address);
-        expect(sellerConfig.sell_token_address).toEqual(usdc.address);
-        expect(sellerConfig.sell_token_amount).toEqual(sellTokenAmount);
-        expect(sellerConfig.buy_token_address).toEqual(eth.address);
-        expect(sellerConfig.buy_token_amount).toEqual(buyTokenAmount);
-        expect(sellerConfig.randomness).not.toEqual(0n);
+        // Sender can read private invoice details
+        const senderInvoice = await getInvoice(
+            senderWallet,
+            senderAddress,
+            invoiceRegistry,
+            invoiceId
+        );
+        expect(senderInvoice.sender).toEqual(senderAddress);
+        expect(senderInvoice.metadata).toEqual(metadata);
+        expect(senderInvoice.invoice_id).toEqual(invoiceId);
 
-        // register contract without decryption keys
-        await buyerWallet.registerContract(escrow);
+        // Payer CANNOT read private details (will fail without encryption key)
+        await expect(async () => {
+            await getInvoice(
+                payerWallet,
+                payerAddress,
+                invoiceRegistry,
+                invoiceId
+            );
+        }).rejects.toThrow();
 
-        // check if maker note exists
-        expect(async () => {
-            await escrow
-                .withWallet(buyerWallet)
-                .methods.get_config()
-                .simulate({ from: buyerAddress });
-        }).toThrow()
-
-        // add account to buyer pxe
-        await buyerWallet.registerContract(escrow, undefined, escrowMasterKey);
-        await escrow
-            .withWallet(buyerWallet)
-            .methods.sync_private_state()
-            .simulate({ from: buyerAddress });
-        const buyerDefinition = await escrow
-            .withWallet(buyerWallet)
-            .methods
-            .get_config()
-            .simulate({ from: buyerAddress });
-        expect(buyerDefinition.owner).not.toEqual(0n);
+        // But payer CAN read public payment info (what they need to pay)
+        const paymentInfo = await getPaymentInfo(
+            payerWallet,
+            payerAddress,
+            invoiceRegistry,
+            invoiceId
+        );
+        expect(paymentInfo.token_address).toEqual(eth.address);
+        expect(paymentInfo.amount).toEqual(invoiceAmount);
+        expect(paymentInfo.title_hash).toEqual(titleHash);
+        expect(paymentInfo.partial_note).not.toEqual(Fr.ZERO);
     });
 
-    test("e2e", async () => {
-        // deploy new escrow instance
-        ({ contract: escrow, secretKey: escrowMasterKey } = await deployEscrowContract(
-            sellerWallet,
-            sellerAddress,
-            usdc.address,
-            sellTokenAmount,
+    test("complete invoice flow - create, pay, verify", async () => {
+        const invoiceId = Fr.random();
+        const titleHash = Fr.random(); // In production, would be hash of "Web Development Services"
+        const metadata = Fr.random(); // In production, would be encrypted
+
+        // Check balances before invoice creation
+        expect(
+            await expectBalancePrivate(senderWallet, senderAddress, eth, senderETHInitialBalance)
+        ).toBeTruthy();
+        expect(
+            await expectBalancePrivate(payerWallet, payerAddress, eth, payerETHInitialBalance)
+        ).toBeTruthy();
+
+        // Step 1: Sender creates invoice
+        console.log("Creating invoice...");
+        await createInvoice(
+            senderWallet,
+            senderAddress,
+            invoiceRegistry,
+            invoiceId,
+            titleHash,
             eth.address,
-            buyTokenAmount,
-        ));
+            invoiceAmount,
+            metadata
+        );
 
-        // check balances before
+        // Verify invoice is not paid yet
+        const isPaidBefore = await isInvoicePaid(
+            payerWallet,
+            payerAddress,
+            invoiceRegistry,
+            invoiceId
+        );
+        expect(isPaidBefore).toBe(false);
+
+        // Step 2: Payer pays invoice
+        console.log("Paying invoice...");
+        const nonce = Fr.random();
+        await payInvoice(
+            payerWallet,
+            payerAddress,
+            invoiceRegistry,
+            invoiceId,
+            nonce
+        );
+
+        // Step 3: Verify payment status
+        const isPaidAfter = await isInvoicePaid(
+            payerWallet,
+            payerAddress,
+            invoiceRegistry,
+            invoiceId
+        );
+        expect(isPaidAfter).toBe(true);
+
+        // Step 4: Check final balances
+        const expectedPayerETHAfterPayment = payerETHInitialBalance - invoiceAmount;
+        const expectedSenderETHAfterPayment = senderETHInitialBalance + invoiceAmount;
+
         expect(
-            expectBalancePrivate(sellerWallet, sellerAddress, usdc, sellerUSDCInitialBalance)
+            await expectBalancePrivate(payerWallet, payerAddress, eth, expectedPayerETHAfterPayment)
         ).toBeTruthy();
         expect(
-            expectBalancePrivate(sellerWallet, escrow.address, usdc, 0n)
+            await expectBalancePrivate(senderWallet, senderAddress, eth, expectedSenderETHAfterPayment)
         ).toBeTruthy();
 
-        // deposit tokens into the escrow
-        await depositToEscrow(sellerWallet, sellerAddress, escrow, usdc, sellTokenAmount);
+        console.log("Invoice flow completed successfully!");
+    });
 
-        // check USDC balances after transfer in
-        const expectedUSDCAfterDeposit = sellerUSDCInitialBalance - sellTokenAmount;
-        expect(
-            expectBalancePrivate(sellerWallet, sellerAddress, usdc, expectedUSDCAfterDeposit)
-        ).toBeTruthy();
-        expect(
-            expectBalancePrivate(sellerWallet, escrow.address, usdc, sellTokenAmount)
-        ).toBeTruthy();
+    test("double payment prevention", async () => {
+        const invoiceId = Fr.random();
+        const titleHash = Fr.random(); // In production, would be hash of "Double Payment Test"
+        const metadata = Fr.random(); // In production, would be encrypted
 
+        // Create invoice
+        await createInvoice(
+            senderWallet,
+            senderAddress,
+            invoiceRegistry,
+            invoiceId,
+            titleHash,
+            eth.address,
+            invoiceAmount,
+            metadata
+        );
 
-        // check buyer balance balances before filling order
-        expect(
-            expectBalancePrivate(buyerWallet, sellerAddress, eth, buyerETHInitialBalance)
-        ).toBeTruthy();
-        expect(expectBalancePrivate(buyerWallet, sellerAddress, usdc, 0n)).toBeTruthy();
-        expect(expectBalancePrivate(buyerWallet, escrow.address, eth, 0n)).toBeTruthy();
+        // Pay invoice once
+        const nonce = Fr.random();
+        await payInvoice(
+            payerWallet,
+            payerAddress,
+            invoiceRegistry,
+            invoiceId,
+            nonce
+        );
 
-        // give buyer knowledge of the escrow
-        await buyerWallet.registerContract(escrow, undefined, escrowMasterKey);
+        // Verify it's paid
+        const isPaid = await isInvoicePaid(
+            payerWallet,
+            payerAddress,
+            invoiceRegistry,
+            invoiceId
+        );
+        expect(isPaid).toBe(true);
 
-        // transfer tokens back out
-        await fillOTCOrder(buyerWallet, buyerAddress, escrow, eth, buyTokenAmount);
-
-        // check balances after filling order
-        const expectedETHAfterFill = buyerETHInitialBalance - buyTokenAmount;
-        expect(
-            expectBalancePrivate(buyerWallet, buyerAddress, eth, expectedETHAfterFill)
-        ).toBeTruthy();
-        expect(
-            expectBalancePrivate(buyerWallet, buyerAddress, usdc, sellTokenAmount)
-        ).toBeTruthy();
-        expect(expectBalancePrivate(buyerWallet, escrow.address, usdc, 0n)).toBeTruthy();
-        expect(
-            expectBalancePrivate(sellerWallet, sellerAddress, eth, buyTokenAmount)
-        ).toBeTruthy();
+        // Attempt to pay again (should fail due to nullifier)
+        const nonce2 = Fr.random();
+        await expect(async () => {
+            await payInvoice(
+                payerWallet,
+                payerAddress,
+                invoiceRegistry,
+                invoiceId,
+                nonce2
+            );
+        }).rejects.toThrow(); // Should throw due to duplicate nullifier
     });
 });

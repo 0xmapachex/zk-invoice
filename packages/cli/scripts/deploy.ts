@@ -2,12 +2,14 @@ import "dotenv/config";
 import { deployTokenContract } from "@zk-invoice/contracts/contract";
 import { TOKEN_METADATA } from "@zk-invoice/contracts/constants";
 import { writeFileSync } from "node:fs"
-import { getTestnetSendWaitOptions, getOTCAccounts } from "./utils";
+import { getTestnetSendWaitOptions, getInvoiceAccounts } from "./utils";
 import { createAztecNodeClient } from "@aztec/aztec.js/node";
 import { isTestnet } from "@zk-invoice/contracts/utils";
 
 const { L2_NODE_URL } = process.env;
-if (!L2_NODE_URL) throw new Error("L2_NODE_URL not set in env");
+if (!L2_NODE_URL) {
+    throw new Error("L2_NODE_URL is required. Please set it in .env file (see .env.example)");
+}
 
 // Deploys Ether and USD Coin token contracts
 const main = async () => {
@@ -19,7 +21,7 @@ const main = async () => {
     if (await isTestnet(node)) pxeConfig = { rollupVersion: 1667575857, proverEnabled: false };
 
     // get accounts
-    const { wallet, sellerAddress: deployerAddress } = await getOTCAccounts(node, pxeConfig);
+    const { wallet, senderAddress: deployerAddress } = await getInvoiceAccounts(node, pxeConfig);
 
      // if testnet, get send/ wait opts optimized for waiting and high gas
     const opts = await getTestnetSendWaitOptions(node, wallet, deployerAddress);

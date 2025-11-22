@@ -1,43 +1,43 @@
-import type { Order, CreateOrderRequest } from "../../src/types/api";
+import type { Invoice, CreateInvoiceRequest } from "../../src/types/api";
 import { generateOrderId } from "../../src/utils/uuid";
 
 /**
  * Mock data factory for tests
  */
 
-export function createMockOrderRequest(overrides: Partial<CreateOrderRequest> = {}): CreateOrderRequest {
+export function createMockInvoiceRequest(overrides: Partial<CreateInvoiceRequest> = {}): CreateInvoiceRequest {
   return {
-    escrowAddress: "0x1234567890abcdef1234567890abcdef12345678",
-    contractInstance: "0xcontract1234567890abcdef1234567890abcdef12345678",
-    secretKey: "0xsecret1234567890abcdef1234567890abcdef1234567890abcdef",
-    sellTokenAddress: "0x5678901234abcdef5678901234abcdef56789012",
-    sellTokenAmount: BigInt("1000000000000000000"),
-    buyTokenAddress: "0x9abcdef123456789abcdef123456789abcdef12",
-    buyTokenAmount: BigInt("2000000000000000000"),
+    registryAddress: "0x1234567890abcdef1234567890abcdef12345678",
+    senderAddress: "0x5678901234abcdef5678901234abcdef56789012",
+    partialNoteHash: "0xpartial1234567890abcdef1234567890abcdef1234567890abcdef",
+    title: "Test Invoice",
+    tokenAddress: "0x9abcdef123456789abcdef123456789abcdef12",
+    amount: BigInt("1000000000000000000"),
+    metadata: "Test metadata",
     ...overrides
   };
 }
 
-export function createMockOrder(overrides: Partial<Order> = {}): Order {
-  const baseOrder = createMockOrderRequest();
+export function createMockInvoice(overrides: Partial<Invoice> = {}): Invoice {
+  const baseInvoice = createMockInvoiceRequest();
   return {
-    orderId: generateOrderId(),
-    ...baseOrder,
+    invoiceId: generateOrderId(),
+    status: 'pending',
+    createdAt: Date.now(),
+    ...baseInvoice,
     ...overrides
   };
 }
 
 export const MOCK_ADDRESSES = {
-  escrow1: "0x1111111111111111111111111111111111111111",
-  escrow2: "0x2222222222222222222222222222222222222222",
-  escrow3: "0x3333333333333333333333333333333333333333",
+  registry: "0x1111111111111111111111111111111111111111",
   
-  tokenA: "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-  tokenB: "0xBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
-  tokenC: "0xCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC",
+  eth: "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+  usdc: "0xBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+  dai: "0xCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC",
   
-  user1: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-  user2: "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  sender1: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  payer1: "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
 };
 
 export const MOCK_AMOUNTS = {

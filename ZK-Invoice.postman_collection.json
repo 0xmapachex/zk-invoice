@@ -1,0 +1,232 @@
+{
+  "info": {
+    "name": "ZK Invoice API",
+    "description": "API collection for ZK Invoice Platform - Privacy-preserving invoicing on Aztec",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "invoiceId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/health",
+          "host": ["{{baseUrl}}"],
+          "path": ["health"]
+        },
+        "description": "Check if the API server is running"
+      }
+    },
+    {
+      "name": "Create Invoice",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 201) {",
+              "    const jsonData = pm.response.json();",
+              "    pm.collectionVariables.set('invoiceId', jsonData.id);",
+              "    pm.environment.set('invoiceId', jsonData.id);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"senderAddress\": \"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef\",\n  \"title\": \"Web Development Services - Q1 2025\",\n  \"tokenAddress\": \"0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd\",\n  \"amount\": \"5000000000000000000\",\n  \"metadata\": \"Project Alpha - 50 hours @ 0.1 ETH/hr\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/invoice",
+          "host": ["{{baseUrl}}"],
+          "path": ["invoice"]
+        },
+        "description": "Create a new invoice. The invoice ID will be saved to the environment variable for use in other requests."
+      }
+    },
+    {
+      "name": "Get All Invoices",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/invoice",
+          "host": ["{{baseUrl}}"],
+          "path": ["invoice"]
+        },
+        "description": "Retrieve all invoices without any filters"
+      }
+    },
+    {
+      "name": "Get Invoice by ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/invoice?id={{invoiceId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["invoice"],
+          "query": [
+            {
+              "key": "id",
+              "value": "{{invoiceId}}",
+              "description": "Invoice UUID"
+            }
+          ]
+        },
+        "description": "Retrieve a specific invoice by its ID"
+      }
+    },
+    {
+      "name": "Get Pending Invoices",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/invoice?status=pending",
+          "host": ["{{baseUrl}}"],
+          "path": ["invoice"],
+          "query": [
+            {
+              "key": "status",
+              "value": "pending",
+              "description": "Filter by status (pending, paid)"
+            }
+          ]
+        },
+        "description": "Get all invoices with pending status"
+      }
+    },
+    {
+      "name": "Get Paid Invoices",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/invoice?status=paid",
+          "host": ["{{baseUrl}}"],
+          "path": ["invoice"],
+          "query": [
+            {
+              "key": "status",
+              "value": "paid",
+              "description": "Filter by status"
+            }
+          ]
+        },
+        "description": "Get all invoices that have been paid"
+      }
+    },
+    {
+      "name": "Filter by Token Address",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/invoice?tokenAddress=0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd",
+          "host": ["{{baseUrl}}"],
+          "path": ["invoice"],
+          "query": [
+            {
+              "key": "tokenAddress",
+              "value": "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd",
+              "description": "Filter by token contract address"
+            }
+          ]
+        },
+        "description": "Get all invoices for a specific token"
+      }
+    },
+    {
+      "name": "Filter Pending by Token",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/invoice?status=pending&tokenAddress=0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd",
+          "host": ["{{baseUrl}}"],
+          "path": ["invoice"],
+          "query": [
+            {
+              "key": "status",
+              "value": "pending"
+            },
+            {
+              "key": "tokenAddress",
+              "value": "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd"
+            }
+          ]
+        },
+        "description": "Combine filters - pending invoices for specific token"
+      }
+    },
+    {
+      "name": "Mark Invoice as Paid",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"invoiceId\": \"{{invoiceId}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/invoice/paid",
+          "host": ["{{baseUrl}}"],
+          "path": ["invoice", "paid"]
+        },
+        "description": "Mark an invoice as paid. Uses the invoiceId from environment variables (set by Create Invoice request)"
+      }
+    },
+    {
+      "name": "Create Multiple Test Invoices",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"senderAddress\": \"0x{{$randomHex}}{{$randomHex}}{{$randomHex}}{{$randomHex}}\",\n  \"title\": \"Test Invoice - {{$randomLoremWord}}\",\n  \"tokenAddress\": \"0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd\",\n  \"amount\": \"{{$randomInt}}000000000000000000\",\n  \"metadata\": \"Generated at {{$timestamp}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/invoice",
+          "host": ["{{baseUrl}}"],
+          "path": ["invoice"]
+        },
+        "description": "Create a test invoice with random data. Run this multiple times to populate the database."
+      }
+    }
+  ]
+}
+

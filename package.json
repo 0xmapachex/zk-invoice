@@ -27,7 +27,10 @@
     "testnet": "bun run scripts/docker.ts api",
     "anvil": "anvil --host 0.0.0.0 --silent",
     "api": "bun run --filter @zk-invoice/api start",
-    "api:dev": "bun run --filter @zk-invoice/api dev"
+    "api:dev": "bun run --filter @zk-invoice/api dev",
+    "test": "bun run --filter @zk-invoice/api test",
+    "test:api": "bun run --filter @zk-invoice/api test",
+    "test:contracts": "bun run --filter @zk-invoice/contracts test"
   },
   "config": {
     "aztecVersion": "3.0.0-devnet.2"
