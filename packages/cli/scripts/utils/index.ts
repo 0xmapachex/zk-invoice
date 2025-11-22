@@ -119,6 +119,112 @@ export const waitForBlock = async (node: AztecNode, targetBlock: number) => {
     });
 };
 
+/**
+ * Wait for block finalization and PXE synchronization
+ * This ensures the PXE has processed the block and can generate witnesses
+ * 
+ * @param node - Aztec node client
+ * @param transactionBlock - The block number where the transaction was included
+ * @param extraBlocks - Number of additional blocks to wait (default 2 for finalization)
+ * @param pxeProcessingDelay - Extra milliseconds to wait for PXE processing (default 3000)
+ */
+/**
+ * Trigger block production on on-demand sandboxes by submitting a dummy transaction
+ * Many local Aztec sandboxes only produce blocks when there are pending transactions
+ * 
+ * @param wallet - The wallet to use for the dummy transaction
+ * @param from - The address to use as sender
+ * @returns true if a block was likely triggered, false otherwise
+ */
+export const triggerBlockProduction = async (
+    wallet: TestWallet,
+    from: AztecAddress
+): Promise<boolean> => {
+    try {
+        // Register sender to itself (idempotent, safe, triggers block production)
+        await wallet.registerSender(from);
+        return true;
+    } catch (error) {
+        // If this fails, sandbox might not support on-demand blocks
+        return false;
+    }
+};
+
+export const waitForBlockFinalization = async (
+    node: AztecNode,
+    transactionBlock: number,
+    extraBlocks: number = 2,
+    pxeProcessingDelay: number = 3000,
+    timeoutSeconds: number = 60,
+    wallet?: TestWallet,
+    from?: AztecAddress
+): Promise<void> => {
+    const targetBlock = transactionBlock + extraBlocks;
+    console.log(`⏳ Waiting for block finalization...`);
+    console.log(`   Transaction block: ${transactionBlock}`);
+    console.log(`   Target block: ${targetBlock} (+${extraBlocks} for finalization)`);
+
+    let currentBlock = await node.getBlockNumber();
+    let startTime = Date.now();
+    const maxWaitMs = timeoutSeconds * 1000;
+    let lastBlock = currentBlock;
+    let stuckSeconds = 0;
+
+    while (currentBlock < targetBlock) {
+        const elapsed = Date.now() - startTime;
+        
+        // Timeout check - if blocks aren't being produced, give up and proceed
+        if (elapsed > maxWaitMs) {
+            readline.clearLine(process.stdout, 0);
+            readline.cursorTo(process.stdout, 0);
+            console.log(`   ⚠️  Timeout: Blocks stopped at ${currentBlock} (waited ${Math.floor(elapsed/1000)}s)`);
+            console.log(`   ⚠️  Network might be stalled. Proceeding anyway...`);
+            console.log(`   💡 Tip: Restart your Aztec sandbox if this persists\n`);
+            break;
+        }
+        
+        // Check if blocks are stuck (no progress for 5+ seconds)
+        if (currentBlock === lastBlock) {
+            stuckSeconds++;
+            
+            // If stuck for 5+ seconds and we have wallet access, try to trigger block production
+            if (stuckSeconds >= 5 && wallet && from) {
+                readline.clearLine(process.stdout, 0);
+                readline.cursorTo(process.stdout, 0);
+                console.log(`   ⚡ Blocks stuck at ${currentBlock}, triggering production...`);
+                
+                // Trigger block production by submitting a dummy operation
+                await triggerBlockProduction(wallet, from);
+                
+                stuckSeconds = 0; // Reset counter after trigger attempt
+            }
+        } else {
+            stuckSeconds = 0; // Reset if block progressed
+            lastBlock = currentBlock;
+        }
+        
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        currentBlock = await node.getBlockNumber();
+        
+        // Progress indicator
+        const elapsedSec = Math.floor(elapsed / 1000);
+        readline.clearLine(process.stdout, 0);
+        readline.cursorTo(process.stdout, 0);
+        process.stdout.write(`   Block: ${currentBlock}/${targetBlock} (${elapsedSec}s/${timeoutSeconds}s)`);
+    }
+    
+    if (currentBlock >= targetBlock) {
+        readline.clearLine(process.stdout, 0);
+        readline.cursorTo(process.stdout, 0);
+        console.log(`   ✅ Block ${targetBlock} reached`);
+    }
+    
+    // Give PXE extra time to process the block and build witness data
+    console.log(`   ⏳ Waiting ${pxeProcessingDelay}ms for PXE to process...`);
+    await new Promise(resolve => setTimeout(resolve, pxeProcessingDelay));
+    console.log(`   ✅ Finalization complete\n`);
+};
+
 
 export * from "./api.js";
 export * from "./types.js";

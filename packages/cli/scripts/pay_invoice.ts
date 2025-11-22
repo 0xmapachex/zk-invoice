@@ -7,18 +7,23 @@ import {
     getPrivateTransferToCommitmentAuthwit
 } from "@zk-invoice/contracts/contract";
 import { ContractInstanceWithAddressSchema } from "@aztec/stdlib/contract";
-import { 
-    eth as ethDeployment, 
-    usdc as usdcDeployment,
-    registry as registryDeploymentRaw
-} from "./data/deployments.json";
+import deploymentsData from "./data/deployments.json";
+
+const deployments = deploymentsData as typeof deploymentsData & {
+  registry?: {
+    address: string;
+    secretKey: string;
+    instance: any;
+  };
+};
 import { AztecAddress } from "@aztec/aztec.js/addresses";
 import { Fr } from "@aztec/aztec.js/fields";
 import {
     getInvoices,
     getInvoiceAccounts,
     getTestnetSendWaitOptions,
-    markInvoicePaid
+    markInvoicePaid,
+    waitForBlockFinalization
 } from "./utils";
 import { createAztecNodeClient } from "@aztec/aztec.js/node";
 
@@ -57,13 +62,22 @@ const main = async () => {
     const node = await createAztecNodeClient(L2_NODE_URL);
     const { wallet, payerAddress } = await getInvoiceAccounts(node);
 
+    // Check if registry is deployed
+    if (!deployments.registry) {
+        console.error("❌ Registry contract not deployed!");
+        console.error("\nPlease deploy the registry first:");
+        console.error("  bun run deploy:registry\n");
+        process.exit(1);
+    }
+
     // get token contract
     const tokenAddress = AztecAddress.fromString(invoiceToPay.tokenAddress);
+    console.log("Setting up token contracts and syncing state...");
     const token = await getTokenContract(wallet, payerAddress, node, tokenAddress);
 
     // register other token (ETH or USDC) to ensure PXE knows about it
-    const ethAddress = AztecAddress.fromString(ethDeployment.address);
-    const usdcAddress = AztecAddress.fromString(usdcDeployment.address);
+    const ethAddress = AztecAddress.fromString(deployments.eth.address);
+    const usdcAddress = AztecAddress.fromString(deployments.usdc.address);
     if (!tokenAddress.equals(ethAddress)) {
         await getTokenContract(wallet, payerAddress, node, ethAddress);
     }
@@ -71,10 +85,24 @@ const main = async () => {
         await getTokenContract(wallet, payerAddress, node, usdcAddress);
     }
 
+    // Check payer's balance before attempting payment
+    console.log("Checking payer balance...");
+    const payerBalance = await token.methods.balance_of_private(payerAddress).simulate({ from: payerAddress });
+    // Amount comes from API as string, so convert it
+    const requiredAmount = typeof invoiceToPay.amount === 'string' 
+        ? BigInt(invoiceToPay.amount)
+        : BigInt(invoiceToPay.amount.toString());
+    console.log(`  Payer balance: ${payerBalance.toString()}`);
+    console.log(`  Required amount: ${requiredAmount.toString()}`);
+    
+    if (payerBalance < requiredAmount) {
+        throw new Error(`Insufficient balance. Have ${payerBalance.toString()}, need ${requiredAmount.toString()}. Run 'bun run mint' first.`);
+    }
+
     // get registry contract
     const registryDeployment = {
-        ...registryDeploymentRaw,
-        instance: ContractInstanceWithAddressSchema.parse(registryDeploymentRaw.instance)
+        ...deployments.registry,
+        instance: ContractInstanceWithAddressSchema.parse(deployments.registry.instance)
     };
     const registryAddress = AztecAddress.fromString(registryDeployment.address);
     const registrySecretKey = Fr.fromString(registryDeployment.secretKey);
@@ -93,20 +121,63 @@ const main = async () => {
     console.log("Processing payment...");
     const invoiceId = Fr.fromString(invoiceToPay.invoiceId);
     const partialNote = Fr.fromString(invoiceToPay.partialNoteHash);
-    const amount = BigInt(invoiceToPay.amount);
+    // Amount comes from API as string, so convert it
+    const amount = typeof invoiceToPay.amount === 'string' 
+        ? BigInt(invoiceToPay.amount)
+        : BigInt(invoiceToPay.amount.toString());
     
-    const txHash = await payInvoice(
-        wallet,
-        payerAddress,
-        registry,
-        invoiceId,
-        partialNote,
-        token,
-        tokenAddress,
-        amount,
-        opts
-    );
-    console.log(`✅ Payment processed, tx hash: ${txHash}\n`);
+    // Perform one more sync before payment to ensure all notes are available
+    console.log("Final sync before payment...");
+    await token.methods.sync_private_state().simulate({ from: payerAddress });
+    
+    let txHash;
+    let retries = 3;
+    let lastError;
+    
+    // Retry payment if sync issues occur
+    for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+            console.log(`Payment attempt ${attempt}/${retries}...`);
+            txHash = await payInvoice(
+                wallet,
+                payerAddress,
+                registry,
+                invoiceId,
+                partialNote,
+                token,
+                tokenAddress,
+                amount,
+                opts
+            );
+            console.log(`✅ Payment processed, tx hash: ${txHash}\n`);
+            break;
+        } catch (error: any) {
+            lastError = error;
+            if (error?.message?.includes("Nullifier witness not found") && attempt < retries) {
+                console.log(`⚠️  Sync issue detected - PXE doesn't have witness data yet`);
+                
+                if (L2_NODE_URL.includes('localhost')) {
+                    console.log(`   Local sandbox - waiting 5s and resyncing...`);
+                    await new Promise(resolve => setTimeout(resolve, 5000));
+                } else {
+                    console.log(`   Waiting for more blocks to be processed...`);
+                    const currentBlock = await node.getBlockNumber();
+                    await waitForBlockFinalization(node, currentBlock, 2, 3000, 30, wallet, payerAddress);
+                }
+                
+                // Resync after wait
+                console.log(`   Resyncing private state...`);
+                await token.methods.sync_private_state().simulate({ from: payerAddress });
+                console.log(`   Retrying payment (attempt ${attempt + 1}/${retries})...\n`);
+            } else {
+                throw error;
+            }
+        }
+    }
+    
+    if (!txHash) {
+        throw lastError || new Error("Payment failed after all retries");
+    }
 
     // verify payment was successful
     console.log("Verifying payment...");

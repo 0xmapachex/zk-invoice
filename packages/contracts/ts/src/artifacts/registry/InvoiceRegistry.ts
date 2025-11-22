@@ -9,7 +9,7 @@ import { EthAddress } from '@aztec/aztec.js/addresses';
 import { Fr, Point } from '@aztec/aztec.js/fields';
 import { type PublicKey, PublicKeys } from '@aztec/aztec.js/keys';
 import type { Wallet } from '@aztec/aztec.js/wallet';
-import InvoiceRegistryContractArtifactJson from '../../../../target/otc_escrow-InvoiceRegistry.json' with { type: 'json' };
+import InvoiceRegistryContractArtifactJson from './InvoiceRegistry.json' with { type: 'json' };
 export const InvoiceRegistryContractArtifact = loadContractArtifact(InvoiceRegistryContractArtifactJson as NoirCompiledContract);
 
 
@@ -129,8 +129,8 @@ title_hashes: {
     /** is_paid(invoice_id: field) */
     is_paid: ((invoice_id: FieldLike) => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
 
-    /** pay_invoice(invoice_id: field, _nonce: field) */
-    pay_invoice: ((invoice_id: FieldLike, _nonce: FieldLike) => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
+    /** pay_invoice(invoice_id: field, partial_note: field, token_address: struct, amount: integer, _nonce: field) */
+    pay_invoice: ((invoice_id: FieldLike, partial_note: FieldLike, token_address: AztecAddressLike, amount: (bigint | number), _nonce: FieldLike) => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
 
     /** process_message(message_ciphertext: struct, message_context: struct) */
     process_message: ((message_ciphertext: FieldLike[], message_context: { tx_hash: FieldLike, unique_note_hashes_in_tx: FieldLike[], first_nullifier_in_tx: FieldLike, recipient: AztecAddressLike }) => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;

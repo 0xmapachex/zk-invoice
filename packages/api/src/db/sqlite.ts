@@ -119,6 +119,42 @@ export class SQLiteDatabase implements IDatabase {
   }
 
   /**
+   * Update an invoice
+   */
+  updateInvoice(invoiceId: string, invoice: Invoice): boolean {
+    const stmt = this.db.prepare(`
+      UPDATE invoices 
+      SET registryAddress = ?,
+          senderAddress = ?,
+          partialNoteHash = ?,
+          title = ?,
+          tokenAddress = ?,
+          amount = ?,
+          status = ?,
+          metadata = ?
+      WHERE invoiceId = ?
+    `);
+    
+    try {
+      const result = stmt.run(
+        invoice.registryAddress,
+        invoice.senderAddress,
+        invoice.partialNoteHash,
+        invoice.title,
+        invoice.tokenAddress,
+        invoice.amount.toString(),
+        invoice.status,
+        invoice.metadata || null,
+        invoiceId
+      );
+      return result.changes > 0;
+    } catch (error) {
+      console.error(`Error updating invoice ${invoiceId}:`, error);
+      return false;
+    }
+  }
+
+  /**
    * Mark an invoice as paid
    */
   markInvoicePaid(invoiceId: string): boolean {

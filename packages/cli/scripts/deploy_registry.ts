@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { deployInvoiceRegistry } from "@zk-invoice/contracts/contract";
-import { getInvoiceAccounts, getTestnetSendWaitOptions } from "./utils";
+import { getInvoiceAccounts, getTestnetSendWaitOptions, waitForBlockFinalization } from "./utils";
 import { createAztecNodeClient } from "@aztec/aztec.js/node";
 import { writeFileSync } from "fs";
 import { join } from "path";
@@ -32,6 +32,16 @@ const main = async () => {
     console.log(`\n✅ Invoice Registry deployed successfully!`);
     console.log(`   Address: ${registryContract.address}`);
     console.log(`   Secret Key: ${secretKey}`);
+
+    // Wait for deployment to be finalized
+    if (L2_NODE_URL.includes('localhost')) {
+        console.log("\n⚠️  Local sandbox - waiting 3s for deployment to settle...");
+        await new Promise(resolve => setTimeout(resolve, 3000));
+    } else {
+        console.log("\nWaiting for deployment to finalize...");
+        const deploymentBlock = await node.getBlockNumber();
+        await waitForBlockFinalization(node, deploymentBlock, 2, 3000, 60, wallet, senderAddress);
+    }
 
     // Save deployment info to deployments.json
     const deploymentInfo = {

@@ -26,6 +26,13 @@ export interface IDatabase {
   getAllInvoices(): Invoice[];
 
   /**
+   * Update an invoice
+   * @param invoiceId - the invoice ID to update
+   * @param invoice - the updated invoice data
+   */
+  updateInvoice(invoiceId: string, invoice: Invoice): boolean;
+
+  /**
    * Mark an invoice as paid
    * @param invoiceId - the invoice ID to mark as paid
    */

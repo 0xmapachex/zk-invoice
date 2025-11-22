@@ -20,7 +20,7 @@ import {
 
 /**
  * Deploys a new instance of the Invoice Registry Contract (one-time deployment)
- * @dev This contract handles all invoices, unlike OTC which deployed per-order
+ * @dev This contract handles all invoices in a single registry
  * 
  * @param wallet - the wallet of the deploying account
  * @param from - the account deploying the Invoice Registry

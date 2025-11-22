@@ -1,4 +1,4 @@
-name: PXE Tests for Aztec OTC Desk
+name: PXE Tests for Aztec zk-invoice
 
 on:
     push:

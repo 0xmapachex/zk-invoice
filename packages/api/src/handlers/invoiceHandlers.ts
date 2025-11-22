@@ -181,6 +181,78 @@ export function createInvoiceHandlers(database: IDatabase) {
   };
 
   /**
+   * Handle PATCH /invoice/:id - Update an invoice (e.g., partial note hash)
+   */
+  const handleUpdateInvoice: RequestHandler = async (req: Request): Promise<Response> => {
+    try {
+      const url = new URL(req.url);
+      const pathParts = url.pathname.split('/');
+      const invoiceId = pathParts[pathParts.length - 1];
+
+      if (!invoiceId) {
+        return new Response(
+          JSON.stringify({ success: false, error: "Invoice ID required" }),
+          { status: 400, headers: { "Content-Type": "application/json" } }
+        );
+      }
+
+      const updates = await req.json();
+      
+      // Get existing invoice
+      const invoice = database.getInvoiceById(invoiceId);
+      if (!invoice) {
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: `Invoice #${invoiceId} not found` 
+          }),
+          { status: 404, headers: { "Content-Type": "application/json" } }
+        );
+      }
+
+      // Update allowed fields (currently only partialNoteHash)
+      if (updates.partialNoteHash !== undefined) {
+        invoice.partialNoteHash = updates.partialNoteHash;
+      }
+
+      // Save updated invoice
+      const success = database.updateInvoice(invoiceId, invoice);
+      
+      if (success) {
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            message: `Invoice #${invoiceId} updated successfully`,
+            data: serializeInvoice(invoice)
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      } else {
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: `Failed to update invoice #${invoiceId}` 
+          }),
+          { status: 500, headers: { "Content-Type": "application/json" } }
+        );
+      }
+    } catch (error) {
+      const response: ApiResponse = {
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to update invoice"
+      };
+
+      return new Response(
+        JSON.stringify(response),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json" }
+        }
+      );
+    }
+  };
+
+  /**
    * Handle POST /invoice/paid - Mark an invoice as paid
    * This can be called by event listener or manually
    */
@@ -233,6 +305,7 @@ export function createInvoiceHandlers(database: IDatabase) {
   return {
     handleCreateInvoice,
     handleGetInvoice,
+    handleUpdateInvoice,
     handleMarkPaid
   };
 }

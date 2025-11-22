@@ -1,4 +1,4 @@
-name: CLI/ API Tests for Aztec OTC Desk
+name: CLI/ API Tests for Aztec Invoice System
 
 on:
     push:
@@ -43,12 +43,15 @@ jobs:
         - name: Deploy token contracts
           run: cd packages/cli && bun run setup:deploy
         
+        - name: Deploy registry contract
+          run: cd packages/cli && bun run deploy:registry
+        
         - name: Mint tokens
           run: cd packages/cli && bun run setup:mint
         
-        - name: Create OTC Order
-          run: cd packages/cli && bun run order:create
+        - name: Create Invoice
+          run: cd packages/cli && bun run invoice:create
         
-        - name: Fill OTC Order
-          run: cd packages/cli && bun run order:fill
+        - name: Pay Invoice
+          run: cd packages/cli && bun run invoice:pay
   

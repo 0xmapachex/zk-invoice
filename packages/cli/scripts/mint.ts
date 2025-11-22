@@ -3,7 +3,8 @@ import {
     ETH_MINT_AMOUNT,
     getInvoiceAccounts,
     USDC_MINT_AMOUNT,
-    getTestnetSendWaitOptions
+    getTestnetSendWaitOptions,
+    waitForBlockFinalization
 } from "./utils";
 import { eth as ethDeployment, usdc as usdcDeployment } from "./data/deployments.json"
 import { AztecAddress } from "@aztec/aztec.js/addresses";
@@ -34,20 +35,28 @@ const main = async () => {
     const eth = await getTokenContract(wallet, senderAddress, node, ethAddress);
     
     console.log("Minting ETH to payer account (for paying invoices)...");
-    await eth
+    const ethReceipt = await eth
         .withWallet(wallet)
         .methods
         .mint_to_private(payerAddress, ETH_MINT_AMOUNT)
         .send(opts.send)
         .wait(opts.wait);
     console.log("✅ 10 ETH minted to payer");
+    
+    // Wait for ETH mint to finalize
+    if (L2_NODE_URL.includes('localhost')) {
+        console.log("⚠️  Local sandbox - skipping block wait, using fixed delay");
+        await new Promise(resolve => setTimeout(resolve, 3000));
+    } else {
+        await waitForBlockFinalization(node, ethReceipt.blockNumber!, 2, 3000, 60, wallet, senderAddress);
+    }
 
     // Mint USDC to payer (for paying USDC invoices)
     const usdcAddress = AztecAddress.fromString(usdcDeployment.address);
     const usdc = await getTokenContract(wallet, senderAddress, node, usdcAddress);
 
     console.log("Minting USDC to payer account (for paying invoices)...");
-    await usdc
+    const usdcReceipt = await usdc
         .withWallet(wallet)
         .methods
         .mint_to_private(payerAddress, USDC_MINT_AMOUNT)
@@ -55,8 +64,17 @@ const main = async () => {
         .wait(opts.wait);
     console.log("✅ 50,000 USDC minted to payer");
     
+    // Wait for USDC mint to finalize
+    if (L2_NODE_URL.includes('localhost')) {
+        console.log("⚠️  Local sandbox - skipping block wait, using fixed delay");
+        await new Promise(resolve => setTimeout(resolve, 3000));
+    } else {
+        await waitForBlockFinalization(node, usdcReceipt.blockNumber!, 2, 3000, 60, wallet, senderAddress);
+    }
+    
     console.log("\n✨ Payer now has funds to pay invoices in ETH or USDC!");
     console.log("   Sender will receive payments when invoices are paid.");
+    console.log("   ✅ All transactions finalized and ready for use");
 }
 
 main();

@@ -1,4 +1,4 @@
-name: TXE Tests for Aztec OTC Desk
+name: TXE Tests for Aztec Invoice System
 
 on:
     push:

@@ -26,6 +26,9 @@
     "setup:mint": "bun run scripts/mint.ts",
     "deploy:registry": "bun run scripts/deploy_registry.ts",
     "invoice:create": "bun run scripts/create_invoice.ts",
-    "invoice:pay": "bun run scripts/pay_invoice.ts"
+    "invoice:pay": "bun run scripts/pay_invoice.ts",
+    "invoice:check-db": "bun run scripts/check_invoice_db.ts",
+    "invoice:get-onchain": "bun run scripts/get_invoice_onchain.ts",
+    "invoice:fix-partial-notes": "bun run scripts/fix_invoice_partial_notes.ts"
   }
 }

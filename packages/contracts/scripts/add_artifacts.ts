@@ -32,19 +32,19 @@ async function main() {
     console.log(`Working in contracts directory: ${contractsDir}`);
     process.chdir(contractsDir);
 
-    console.log("Moving escrow artifacts...");
-    // Move the escrow artifacts
+    console.log("Moving invoice registry artifacts...");
+    // Move the invoice registry artifacts
     await copyFileWithLog(
-      "./target/otc_escrow-OTCEscrow.json",
-      "./ts/src/artifacts/escrow/OTCEscrow.json"
+      "./target/otc_escrow-InvoiceRegistry.json",
+      "./ts/src/artifacts/registry/InvoiceRegistry.json"
     );
 
     console.log("Fixing import paths...");
     // Fix imports using string replacement instead of sed
     await replaceInFile(
-      "./ts/src/artifacts/escrow/OTCEscrow.ts",
-      "../../../../target/otc_escrow-OTCEscrow.json",
-      "./OTCEscrow.json"
+      "./ts/src/artifacts/registry/InvoiceRegistry.ts",
+      "../../../../target/otc_escrow-InvoiceRegistry.json",
+      "./InvoiceRegistry.json"
     );
 
     console.log("Artifacts moved and imports fixed successfully!");

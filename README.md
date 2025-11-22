@@ -239,10 +239,10 @@ bun run sandbox
 ```bash
 cd packages/cli
 bun run setup:deploy    # Deploy token contracts
-bun run setup:mint      # Mint tokens to trading accounts ⭐ REQUIRED
+bun run setup:mint      # Mint tokens to payer account ⭐ REQUIRED
 bun run balances        # Check balances after minting
-bun run order:create    # Create OTC order (seller)
-bun run order:fill      # Fill OTC order (buyer)
+bun run invoice:create  # Create invoice (sender)
+bun run invoice:pay     # Pay invoice (payer)
 bun run balances        # Check final balances
 ```
 
@@ -278,9 +278,9 @@ zk-invoice/
 ├── packages/
 │   ├── contracts/           # Aztec Noir smart contracts
 │   │   ├── src/
-│   │   │   ├── main.nr     # OTC Escrow Contract
+│   │   │   ├── main.nr     # Invoice Registry Contract
 │   │   │   └── types/      # Custom types and notes
-│   │   └── ts/             # Contract artifacts and TS libraries for calling the OTC contracts
+│   │   └── ts/             # Contract artifacts and TS libraries for calling the invoice contracts
 │   ├── cli/                # CLI demonstration
 │   │   ├── scripts/        # Demo scripts
 │   │   └── data/           # Test data and deployments
@@ -314,45 +314,63 @@ This Invoice desk leverages Aztec's advanced privacy features to ensure confiden
 
 ## 📚 Usage Examples
 
-### Creating an OTC Order
+### Creating an Invoice
 
 ```typescript
-// 1. Deploy escrow contract with trade parameters
-const escrow = await OTCEscrowContract.deploy(
-  sellTokenAddress,
-  sellTokenAmount,
-  buyTokenAddress,
-  buyTokenAmount
+// 1. Create invoice in registry contract
+const txHash = await registry.methods.create_invoice(
+  invoiceId,
+  titleHash,
+  tokenAddress,
+  amount,
+  metadata
 ).send().wait();
 
-// 2. Transfer sell tokens to escrow
-await sellToken.methods.transfer(escrowAddress, sellTokenAmount).send().wait();
+// 2. Fetch partial note hash from blockchain
+const paymentInfo = await registry.methods.get_payment_info(invoiceId).simulate();
+const partialNoteHash = paymentInfo.partial_note.toString();
 
-// 3. Register order with orderflow service
-const response = await fetch('http://localhost:3000/order', {
+// 3. Register invoice in API
+const response = await fetch('http://localhost:3000/invoice', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
-    escrowAddress: escrow.address,
-    sellTokenAddress,
-    sellTokenAmount: sellTokenAmount.toString(),
-    buyTokenAddress,
-    buyTokenAmount: buyTokenAmount.toString()
+    invoiceId: invoiceId.toString(),
+    registryAddress: registry.address.toString(),
+    senderAddress: sender.toString(),
+    partialNoteHash,
+    title: "Payment for Services",
+    tokenAddress: tokenAddress.toString(),
+    amount: amount.toString()
   })
 });
 ```
 
-### Filling an OTC Order
+### Paying an Invoice
 
 ```typescript
-// 1. Query available orders
-const orders = await fetch('http://localhost:3000/order').then(r => r.json());
+// 1. Query pending invoices
+const invoices = await fetch('http://localhost:3000/invoice?status=pending').then(r => r.json());
+const invoice = invoices.data[0];
 
-// 2. Connect to escrow contract
-const escrow = await OTCEscrowContract.at(orders.data[0].escrowAddress);
+// 2. Create authwit for payment
+const { authwit, nonce } = await getPrivateTransferToCommitmentAuthwit(
+  wallet, 
+  payer, 
+  token, 
+  registry.address, 
+  Fr.fromString(invoice.partialNoteHash), 
+  BigInt(invoice.amount)
+);
 
-// 3. Execute the trade
-await escrow.methods.fill_order().send().wait();
+// 3. Pay the invoice
+await registry.methods.pay_invoice(
+  Fr.fromString(invoice.invoiceId),
+  Fr.fromString(invoice.partialNoteHash),
+  AztecAddress.fromString(invoice.tokenAddress),
+  BigInt(invoice.amount),
+  nonce
+).send({ authWitnesses: [authwit] }).wait();
 ```
 
 ## 🤝 Contributing
@@ -370,11 +388,10 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## 🔗 Links
 
-- [ZK Invoice on Aztec - Project Documentation](https://www.notion.so/aztecnetwork/Private-OTC-Desk-on-Aztec-271a1f6b0e3580088ea5d6d06cbaa2d1?source=copy_link)
 - [Aztec Network](https://aztec.network)
 - [Aztec Documentation](https://docs.aztec.network)
 - [Bun Runtime](https://bun.sh)
 
 ---
 
-Built with ❤️ on Aztec Network for private, secure OTC trading.
+Built with ❤️ on Aztec Network for private, secure invoice payments.

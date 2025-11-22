@@ -17,6 +17,7 @@ const main = async () => {
   const {
     handleCreateInvoice,
     handleGetInvoice,
+    handleUpdateInvoice,
     handleMarkPaid
   } = createInvoiceHandlers(database);
   
@@ -35,6 +36,11 @@ const main = async () => {
           default:
             return new Response("Method Not Allowed", { status: 405 });
         }
+      }
+
+      // /invoice/:id endpoint - handles PATCH for updating invoice
+      if (url.pathname.startsWith("/invoice/") && url.pathname !== "/invoice/paid" && req.method === "PATCH") {
+        return handleUpdateInvoice(req);
       }
 
       // /invoice/paid endpoint - marks invoice as paid

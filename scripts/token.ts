@@ -105,7 +105,7 @@ async function main() {
       "./Token.json"
     );
 
-    console.log("Copying token artifact to imported in TXE...")
+    console.log("Copying token artifact for TXE tests...")
     if (!existsSync("packages/contracts/target")) {
       await mkdir("packages/contracts/target", { recursive: true });
     }

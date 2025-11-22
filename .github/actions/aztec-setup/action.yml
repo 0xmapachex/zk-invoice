@@ -1,5 +1,5 @@
-name: 'Common Aztec OTC Desk Setup'
-description: 'Sets up Bun, Aztec, compiles, and optionally runs Sandbox & 2 PXEs'
+name: 'Common Aztec Invoice Setup'
+description: 'Sets up Bun, Aztec, compiles, and optionally runs Sandbox & API'
 
 inputs:
   node-version:
@@ -11,7 +11,7 @@ inputs:
     required: false
     default: 'false'
   start-api:
-    description: 'Whether to start the Orderflow API'
+    description: 'Whether to start the Invoice API'
     required: false
     default: 'false'
 
@@ -68,7 +68,7 @@ runs:
         bun run scripts/docker.ts sandbox &
       shell: bash
     
-    - name: Start Sandbox and Orderflow API
+    - name: Start Sandbox and Invoice API
       if: inputs.start-sandbox == 'true' && inputs.start-api == 'true'
       run: |
         bun run sandbox &
