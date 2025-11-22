@@ -1,0 +1,19 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "allowImportingTsExtensions": false,
+    "verbatimModuleSyntax": false,
+    "paths": {
+      "@aztec/contracts/*": ["./src/*"]
+    }
+  },
+  "include": [
+    "packages/**/*",
+    "scripts/**/*",
+    "packages/**/*.json",
+    "packages/**/artifacts/**/*",
+    "packages/**/target/**/*"
+  ]
+}

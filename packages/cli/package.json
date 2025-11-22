@@ -1,0 +1,30 @@
+{
+  "name": "@zk-invoice/cli",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+      "@types/bun": "catalog:",
+      "@types/jest": "catalog:",
+      "@aztec/aztec.js": "catalog:",
+      "@aztec/accounts": "catalog:",
+      "@aztec/ethereum": "catalog:",
+      "@aztec/noir-contracts.js": "catalog:",
+      "@aztec/pxe": "catalog:",
+      "@aztec/test-wallet": "catalog:",
+      "@aztec/stdlib": "catalog:",
+      "@zk-invoice/contracts": "workspace:*",
+      "dotenv": "catalog:"
+  },
+  "peerDependencies": {
+    "typescript": "catalog:"
+  },
+  "scripts": {
+    "balances": "bun run scripts/print_balances.ts",
+    "setup:accounts": "bun run scripts/setup_accounts.ts",
+    "setup:deploy": "bun run scripts/deploy.ts",
+    "setup:mint": "bun run scripts/mint.ts",
+    "order:create": "bun run scripts/create_order.ts",
+    "order:fill": "bun run scripts/buy_order.ts"
+  }
+}
