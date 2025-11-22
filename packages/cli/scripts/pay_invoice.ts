@@ -89,19 +89,17 @@ const main = async () => {
         throw new Error(`Insufficient balance. Have ${payerBalance.toString()}, need ${requiredAmount.toString()}. Run 'bun run mint' first.`);
     }
 
-    // get registry contract
+    // get registry contract (payer doesn't need secret key)
     const registryDeployment = {
         ...deployments.registry,
         instance: ContractInstanceWithAddressSchema.parse(deployments.registry.instance)
     };
     const registryAddress = AztecAddress.fromString(registryDeployment.address);
-    const registrySecretKey = Fr.fromString(registryDeployment.secretKey);
     const registry = await getInvoiceRegistry(
         wallet,
         payerAddress,
         registryAddress,
-        registryDeployment.instance,
-        registrySecretKey
+        registryDeployment.instance
     );
 
     // if testnet, get send/wait opts optimized for waiting and high gas

@@ -31,13 +31,9 @@ const main = async () => {
 
     console.log(`\n✅ Invoice Registry deployed successfully!`);
     console.log(`   Address: ${registryContract.address}`);
-    console.log(`   Secret Key: ${secretKey}`);
 
-    // Wait for deployment to be finalized
-    if (L2_NODE_URL.includes('localhost')) {
-        console.log("\n⚠️  Local sandbox - waiting 3s for deployment to settle...");
-        await new Promise(resolve => setTimeout(resolve, 3000));
-    } else {
+    // On testnet, wait for finalization. On sandbox, deployment is immediately available
+    if (!L2_NODE_URL.includes('localhost')) {
         console.log("\nWaiting for deployment to finalize...");
         const deploymentBlock = await node.getBlockNumber();
         await waitForBlockFinalization(node, deploymentBlock, 2, 3000, 60, wallet, senderAddress);
@@ -47,7 +43,6 @@ const main = async () => {
     const deploymentInfo = {
         registry: {
             address: registryContract.address.toString(),
-            secretKey: secretKey.toString(),
             instance: registryContract.instance
         }
     };

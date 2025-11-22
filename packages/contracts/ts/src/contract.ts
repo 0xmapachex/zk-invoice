@@ -342,9 +342,9 @@ export const getInvoiceRegistry = async (
     from: AztecAddress,
     registryAddress: AztecAddress,
     contractInstance: ContractInstanceWithAddress,
-    registrySecretKey: Fr,
+    registrySecretKey?: Fr,
 ): Promise<InvoiceRegistryContract> => {
-    // register contract with secret key
+    // register contract (with optional secret key for reading private data)
     await wallet.registerContract(
         contractInstance,
         InvoiceRegistryContractArtifact,

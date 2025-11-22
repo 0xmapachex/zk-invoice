@@ -63,7 +63,7 @@ pub contract InvoiceRegistry {
 
         // Store PRIVATE invoice data (encrypted)
         let invoice_note = InvoiceNote::new(
-            context.this_address(),  // owner is the registry contract
+            sender,  // owner is the user (proper per-user encryption)
             sender,
             metadata,
             invoice_id

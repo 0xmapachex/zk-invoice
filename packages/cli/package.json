@@ -21,10 +21,10 @@
   },
   "scripts": {
     "balances": "bun run scripts/check_balances.ts",
+    "cleanup": "bun run scripts/cleanup.ts",
+    "deploy": "bun run scripts/deploy_all.ts",
     "setup:accounts": "bun run scripts/setup_accounts.ts",
-    "setup:deploy": "bun run scripts/deploy.ts",
     "setup:mint": "bun run scripts/mint.ts",
-    "deploy:registry": "bun run scripts/deploy_registry.ts",
     "invoice:create": "bun run scripts/create_invoice.ts",
     "invoice:pay": "bun run scripts/pay_invoice.ts",
     "invoice:check-db": "bun run scripts/check_invoice_db.ts",

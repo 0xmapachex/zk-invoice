@@ -66,13 +66,11 @@ const main = async () => {
     ),
   };
   const registryAddress = AztecAddress.fromString(registryDeployment.address);
-  const registrySecretKey = Fr.fromString(registryDeployment.secretKey);
   const registry = await getInvoiceRegistry(
     wallet,
     senderAddress,
     registryAddress,
-    registryDeployment.instance,
-    registrySecretKey
+    registryDeployment.instance
   );
 
   // if testnet, get send/wait opts optimized for waiting and high gas
