@@ -70,6 +70,54 @@ export interface InvoiceResponse extends ApiResponse {
 
 export type RequestHandler = (req: Request) => Promise<Response>;
 
+/**
+ * Access Request Types
+ */
+export interface AccessRequest {
+  id: string;
+  invoice_id: string;
+  requester_address: string;
+  requester_name?: string;
+  requester_role?: string;
+  reason: string;
+  status: 'pending' | 'approved' | 'denied';
+  requested_at: number;
+  responded_at?: number;
+  response_reason?: string;
+  expires_at?: number;
+}
+
+export interface CreateAccessRequestInput {
+  invoice_id: string;
+  requester_address: string;
+  requester_name?: string;
+  requester_role?: string;
+  reason: string;
+}
+
+export interface UpdateAccessRequestInput {
+  status: 'approved' | 'denied';
+  response_reason?: string;
+  expires_at?: number;
+}
+
+/**
+ * Access Log Types
+ */
+export interface AccessLog {
+  id: string;
+  invoice_id: string;
+  accessor_address: string;
+  action: 'view' | 'download' | 'export';
+  accessed_at: number;
+}
+
+export interface CreateAccessLogInput {
+  invoice_id: string;
+  accessor_address: string;
+  action: 'view' | 'download' | 'export';
+}
+
 // TODO Phase 2: Add encryption-related types
 // export interface EncryptedInvoicePayload {
 //   encryptedData: string;     // Encrypted senderAddress + metadata

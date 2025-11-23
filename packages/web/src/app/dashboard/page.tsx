@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { InvoiceStats } from "@/components/invoice/InvoiceStats";
 import { InvoiceFilter } from "@/components/invoice/InvoiceFilter";
 import { InvoiceTable } from "@/components/invoice/InvoiceTable";
+import { AccessRequestBanner } from "@/components/access/AccessRequestBanner";
 import { useInvoiceStore } from "@/stores/useInvoiceStore";
 import { useWalletStore } from "@/stores/useWalletStore";
 import { getInvoices } from "@/lib/api/client";
@@ -62,10 +63,9 @@ export default function Dashboard() {
       setLoading(true);
       setError(null);
       
-      // Fetch invoices based on current role
-      const filters = role === "seller" && currentAddress 
-        ? { sender: currentAddress }
-        : {};
+      // For POC: Show all invoices regardless of address
+      // In production, filter by actual wallet address
+      const filters = {};
       
       const invoices = await getInvoices(filters);
       setInvoices(invoices);
@@ -155,6 +155,20 @@ export default function Dashboard() {
       <div className="opacity-0 animate-fade-in-up animation-delay-400">
         <InvoiceFilter />
       </div>
+
+      {/* Access Request Banner (Seller Only) */}
+      {role === "seller" && !isLoading && (
+        <div className="opacity-0 animate-fade-in-up animation-delay-500">
+          <AccessRequestBanner 
+            ownerAddress={
+              // Use the actual sender address from invoices if available
+              filteredInvoices.length > 0 
+                ? filteredInvoices[0].senderAddress 
+                : "0x11deabd59b872d17c737b66f61d332230f341e774c6b5d3762f46a74536f947f"
+            } 
+          />
+        </div>
+      )}
       
       {/* Error Message */}
       {error && (

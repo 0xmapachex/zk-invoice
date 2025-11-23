@@ -5,7 +5,7 @@ import type {
   InvoiceResponse,
 } from "@/types/invoice";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
 /**
  * Fetch all invoices or filter by criteria

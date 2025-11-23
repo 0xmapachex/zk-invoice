@@ -9,12 +9,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StatusBadge } from "@/components/invoice/StatusBadge";
 import { TransactionProgress } from "@/components/invoice/TransactionProgress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Download, Share2, ExternalLink, Loader2, ArrowLeft } from "lucide-react";
+import { Download, Share2, ExternalLink, Loader2, ArrowLeft, Lock, Shield } from "lucide-react";
 import { formatUSDC, formatDate, truncateAddress } from "@/lib/utils";
 import { getInvoiceById, markInvoicePaid } from "@/lib/api/client";
 import { useWalletStore } from "@/stores/useWalletStore";
 import { useInvoiceOnChain } from "@/hooks/useInvoiceOnChain";
 import { useToast } from "@/hooks/useToast";
+import { checkInvoiceAccess, logInvoiceAccess } from "@/lib/api/access";
+import { ComplianceRequestDialog } from "@/components/access/ComplianceRequestDialog";
+import { AccessLogViewer } from "@/components/access/AccessLogViewer";
 import type { Invoice } from "@/types/invoice";
 import type { PaymentStatus } from "@/types/invoice";
 
@@ -32,10 +35,38 @@ export default function InvoiceDetailPage() {
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("idle" as PaymentStatus);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [showProgress, setShowProgress] = useState(false);
+  const [hasAccess, setHasAccess] = useState<boolean>(false); // Private by default
+  const [isCheckingAccess, setIsCheckingAccess] = useState(true);
+  const [enableAccessControl, setEnableAccessControl] = useState(false); // Enable via query param
+  
+  // Use the actual blockchain addresses from created invoices
+  // In production, get from actual wallet
+  const mockAddresses = {
+    seller: "0x11deabd59b872d17c737b66f61d332230f341e774c6b5d3762f46a74536f947f", // Real sender address
+    buyer: "0x19d4aaf4040b2577a1f1ca3b05ab3274eb2158c64d79361e40681c3877be8fed",
+  };
+  const currentUserAddress = mockAddresses[role];
   
   useEffect(() => {
     loadInvoice();
+    // Check if access control is enabled via query param
+    const params = new URLSearchParams(window.location.search);
+    setEnableAccessControl(params.get('private') === 'true');
   }, [invoiceId]);
+  
+  useEffect(() => {
+    // Always check access for buyer role, or if explicitly enabled
+    if (invoice && currentUserAddress) {
+      // Sellers always have access
+      if (role === "seller") {
+        setHasAccess(true);
+        setIsCheckingAccess(false);
+      } else {
+        // Buyers need to check access
+        checkAccess();
+      }
+    }
+  }, [invoice, currentUserAddress, role]);
   
   const loadInvoice = async () => {
     try {
@@ -49,6 +80,41 @@ export default function InvoiceDetailPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+  
+  const checkAccess = async () => {
+    if (!invoice || !currentUserAddress) {
+      setHasAccess(false);
+      setIsCheckingAccess(false);
+      return;
+    }
+    
+    try {
+      setIsCheckingAccess(true);
+      const result = await checkInvoiceAccess(invoice.invoiceId, currentUserAddress);
+      setHasAccess(result.hasAccess);
+      
+      // Log access if granted
+      if (result.hasAccess) {
+        try {
+          await logInvoiceAccess(invoice.invoiceId, currentUserAddress, "view");
+        } catch (logErr) {
+          console.error("Failed to log access (non-critical):", logErr);
+          // Don't fail if logging fails
+        }
+      }
+    } catch (err) {
+      console.error("Failed to check access:", err);
+      // On error, deny access (fail closed for privacy)
+      setHasAccess(false);
+    } finally {
+      setIsCheckingAccess(false);
+    }
+  };
+  
+  const handleAccessRequestSubmitted = () => {
+    toast.info("Request Submitted", "Redirecting to dashboard...");
+    setTimeout(() => router.push("/dashboard"), 2000);
   };
   
   const handlePayment = async () => {
@@ -118,7 +184,7 @@ export default function InvoiceDetailPage() {
     }
   };
   
-  if (isLoading) {
+  if (isLoading || isCheckingAccess) {
     return (
       <div className="container mx-auto py-8 px-4 max-w-4xl space-y-6">
         <Skeleton className="h-12 w-3/4" />
@@ -148,6 +214,31 @@ export default function InvoiceDetailPage() {
     );
   }
   
+  // Show access request dialog if user doesn't have permission (only if access control is enabled)
+  if (enableAccessControl && hasAccess === false) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-primary/[0.02] to-purple-500/[0.03] relative overflow-hidden">
+        <div className="absolute inset-0 bg-dots-pattern opacity-30"></div>
+        <div className="container mx-auto py-8 px-4 max-w-4xl relative z-10">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.push("/dashboard")}
+            className="mb-4 hover:bg-accent"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Dashboard
+          </Button>
+          <ComplianceRequestDialog
+            invoiceId={invoice.invoiceId}
+            requesterAddress={currentUserAddress}
+            onRequestSubmitted={handleAccessRequestSubmitted}
+          />
+        </div>
+      </div>
+    );
+  }
+  
   const amount = typeof invoice.amount === "bigint" ? invoice.amount : BigInt(invoice.amount);
   
   let metadata;
@@ -158,6 +249,8 @@ export default function InvoiceDetailPage() {
   }
   
   const canPay = role === "buyer" && invoice.status === "pending" && paymentStatus === "idle";
+  // For POC, assume seller is the owner (in production, check address match)
+  const isOwner = role === "seller";
   
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-primary/[0.02] to-purple-500/[0.03] relative overflow-hidden">
@@ -233,13 +326,14 @@ export default function InvoiceDetailPage() {
           </CardContent>
         </Card>
       
-        {/* Tabs: Updates and Details */}
+        {/* Tabs: Updates, Details, and Access Logs */}
         <Card className="shadow-lg border-border/50 bg-card/80 backdrop-blur-sm opacity-0 animate-fade-in-up animation-delay-400">
           <Tabs defaultValue="updates" className="w-full">
             <CardHeader className="border-b">
-              <TabsList className="grid w-full max-w-md grid-cols-2">
+              <TabsList className={`grid w-full max-w-md ${isOwner ? 'grid-cols-3' : 'grid-cols-2'}`}>
                 <TabsTrigger value="updates">Updates</TabsTrigger>
                 <TabsTrigger value="details">Details</TabsTrigger>
+                {isOwner && <TabsTrigger value="access">Access Log</TabsTrigger>}
               </TabsList>
             </CardHeader>
 
@@ -277,25 +371,62 @@ export default function InvoiceDetailPage() {
             {/* Details Tab */}
             <TabsContent value="details" className="p-6">
               <div className="space-y-6">
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Bill From</h3>
-                    <p className="text-sm font-mono bg-muted/50 rounded-lg p-3">{truncateAddress(invoice.senderAddress)}</p>
-                    {metadata?.clientCompany && (
-                      <p className="text-sm text-muted-foreground">{metadata.clientCompany}</p>
-                    )}
+                {/* Private Information Section - Requires Access */}
+                {!hasAccess && !isOwner ? (
+                  <div className="border-2 border-dashed border-muted rounded-lg p-8 text-center bg-muted/20">
+                    <div className="max-w-md mx-auto space-y-4">
+                      <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+                        <Lock className="h-8 w-8 text-primary" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold mb-2">Private Information</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Sender and recipient details are private. Request access to view this information.
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="text-sm text-muted-foreground space-y-1">
+                          <p><strong>Bill From:</strong> <span className="blur-sm select-none">John Business LLC</span></p>
+                          <p><strong>Bill To:</strong> <span className="blur-sm select-none">Acme Corporation</span></p>
+                        </div>
+                      </div>
+                      <Button onClick={async () => {
+                        try {
+                          setIsCheckingAccess(true);
+                          // Trigger the access request dialog by setting access control and rechecking
+                          setEnableAccessControl(true);
+                          setHasAccess(false);
+                          await checkAccess();
+                        } finally {
+                          setIsCheckingAccess(false);
+                        }
+                      }} size="lg" className="mt-4">
+                        <Shield className="h-4 w-4 mr-2" />
+                        Request Access to Private Details
+                      </Button>
+                    </div>
                   </div>
-                  
-                  <div className="space-y-2">
-                    <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Bill To</h3>
-                    {metadata?.clientName && (
-                      <p className="text-sm font-semibold">{metadata.clientName}</p>
-                    )}
-                    {metadata?.clientEmail && (
-                      <p className="text-sm text-muted-foreground">{metadata.clientEmail}</p>
-                    )}
+                ) : (
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Bill From</h3>
+                      <p className="text-sm font-mono bg-muted/50 rounded-lg p-3">{truncateAddress(invoice.senderAddress)}</p>
+                      {metadata?.clientCompany && (
+                        <p className="text-sm text-muted-foreground">{metadata.clientCompany}</p>
+                      )}
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Bill To</h3>
+                      {metadata?.clientName && (
+                        <p className="text-sm font-semibold">{metadata.clientName}</p>
+                      )}
+                      {metadata?.clientEmail && (
+                        <p className="text-sm text-muted-foreground">{metadata.clientEmail}</p>
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
                 
                 <div className="border-t pt-6 grid md:grid-cols-3 gap-6">
                   <div className="space-y-1">
@@ -314,7 +445,7 @@ export default function InvoiceDetailPage() {
                   </div>
                 </div>
 
-                {metadata?.lineItems && metadata.lineItems.length > 0 && (
+                {(hasAccess || isOwner) && metadata?.lineItems && metadata.lineItems.length > 0 && (
                   <div className="border-t pt-6">
                     <h3 className="font-semibold mb-4">Line Items</h3>
                     <div className="space-y-3">
@@ -335,7 +466,7 @@ export default function InvoiceDetailPage() {
                   </div>
                 )}
 
-                {metadata?.memo && (
+                {(hasAccess || isOwner) && metadata?.memo && (
                   <div className="border-t pt-6">
                     <h3 className="font-semibold mb-2">Notes</h3>
                     <p className="text-sm text-muted-foreground bg-muted/30 rounded-lg p-4">
@@ -352,6 +483,13 @@ export default function InvoiceDetailPage() {
                 </div>
               </div>
             </TabsContent>
+
+            {/* Access Log Tab (Owner Only) */}
+            {isOwner && (
+              <TabsContent value="access" className="p-6">
+                <AccessLogViewer invoiceId={invoice.invoiceId} />
+              </TabsContent>
+            )}
           </Tabs>
         </Card>
       </div>

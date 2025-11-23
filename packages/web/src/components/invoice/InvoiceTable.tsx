@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "./StatusBadge";
-import { Eye, Download, Trash2, DollarSign } from "lucide-react";
+import { Eye, Download, Trash2, DollarSign, Lock } from "lucide-react";
 import { formatUSDC, formatDate, truncateAddress } from "@/lib/utils";
 import { useWalletStore } from "@/stores/useWalletStore";
 import { useRouter } from "next/navigation";
@@ -64,7 +64,7 @@ export function InvoiceTable({ invoices, onDelete, onPay }: InvoiceTableProps) {
             <TableHead>Invoice No.</TableHead>
             <TableHead>Date</TableHead>
             <TableHead>Title</TableHead>
-            <TableHead>From</TableHead>
+            {role === "seller" && <TableHead>From</TableHead>}
             <TableHead>Amount</TableHead>
             <TableHead>Status</TableHead>
             <TableHead className="text-right">Actions</TableHead>
@@ -87,9 +87,11 @@ export function InvoiceTable({ invoices, onDelete, onPay }: InvoiceTableProps) {
                 </TableCell>
                 <TableCell>{formatDate(invoice.createdAt)}</TableCell>
                 <TableCell className="font-medium">{invoice.title}</TableCell>
-                <TableCell className="font-mono text-sm">
-                  {truncateAddress(invoice.senderAddress)}
-                </TableCell>
+                {role === "seller" && (
+                  <TableCell className="font-mono text-sm">
+                    {truncateAddress(invoice.senderAddress)}
+                  </TableCell>
+                )}
                 <TableCell className="font-semibold">
                   {formatUSDC(amount)}
                 </TableCell>

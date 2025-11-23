@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AccountSwitcher } from "./AccountSwitcher";
+import { AccessRequestNotificationBadge } from "@/components/access/AccessRequestNotificationBadge";
 import { Button } from "@/components/ui/button";
 import { useWalletStore } from "@/stores/useWalletStore";
 import { useToast } from "@/hooks/useToast";
@@ -10,6 +12,7 @@ import { truncateAddress } from "@/lib/utils";
 import { useState } from "react";
 
 export function Header() {
+  const router = useRouter();
   const { isConnected, currentAddress, connect, role } = useWalletStore();
   const { toast } = useToast();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -22,6 +25,10 @@ export function Header() {
       console.error("Failed to connect:", error);
       toast.error("Connection Failed", "Unable to connect wallet. Please try again.");
     }
+  };
+  
+  const handleAccessRequestsClick = () => {
+    router.push("/access-requests");
   };
   
   return (
@@ -65,6 +72,11 @@ export function Header() {
         
         {/* Right side */}
         <div className="flex items-center gap-4">
+          {/* Access Request Notifications */}
+          <div className="hidden sm:block">
+            <AccessRequestNotificationBadge onClick={handleAccessRequestsClick} />
+          </div>
+          
           {/* Account Switcher */}
           <div className="hidden sm:block">
             <AccountSwitcher />

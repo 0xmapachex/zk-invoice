@@ -1,4 +1,4 @@
-import type { Invoice } from "../types/api";
+import type { Invoice, AccessRequest, CreateAccessRequestInput, UpdateAccessRequestInput, AccessLog, CreateAccessLogInput } from "../types/api";
 
 /**
  * Database interface for invoice operations
@@ -61,4 +61,58 @@ export interface IDatabase {
    * Close database connection (if applicable)
    */
   close(): void;
+
+  // Access Request methods
+  
+  /**
+   * Create a new access request
+   */
+  createAccessRequest(input: CreateAccessRequestInput): AccessRequest;
+
+  /**
+   * Get access request by ID
+   */
+  getAccessRequestById(id: string): AccessRequest | null;
+
+  /**
+   * Get all access requests for an invoice
+   */
+  getAccessRequestsByInvoice(invoiceId: string): AccessRequest[];
+
+  /**
+   * Get access requests by requester address
+   */
+  getAccessRequestsByRequester(requesterAddress: string): AccessRequest[];
+
+  /**
+   * Get pending access requests for invoice owner
+   */
+  getPendingAccessRequestsByOwner(ownerAddress: string): AccessRequest[];
+
+  /**
+   * Update access request status (approve/deny)
+   */
+  updateAccessRequest(id: string, update: UpdateAccessRequestInput): boolean;
+
+  /**
+   * Check if user has valid access to invoice
+   */
+  hasValidAccess(invoiceId: string, userAddress: string): boolean;
+
+  // Access Log methods
+
+  /**
+   * Create a new access log entry
+   */
+  createAccessLog(input: CreateAccessLogInput): AccessLog;
+
+  /**
+   * Get all access logs for an invoice
+   */
+  getAccessLogsByInvoice(invoiceId: string): AccessLog[];
+
+  /**
+   * Get access logs by accessor address
+   */
+  getAccessLogsByAccessor(accessorAddress: string): AccessLog[];
 }
