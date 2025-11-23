@@ -10,6 +10,110 @@ ZK Invoice is a monorepo containing three main packages that work together to pr
 - **🖥️ CLI Demo**: Bun-based command-line interface demonstrating invoice creation and payment workflow
 - **🌐 Invoice API**: RESTful HTTP service for invoice management and status tracking
 
+### System Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         ZK Invoice System                        │
+└─────────────────────────────────────────────────────────────────┘
+
+┌──────────────┐         ┌──────────────┐         ┌──────────────┐
+│   Terminal 1 │         │   Terminal 2 │         │   Terminal 3 │
+│              │         │              │         │              │
+│    Aztec     │         │  Invoice API │         │  CLI Scripts │
+│   Sandbox    │         │   (Bun)      │         │   (Bun)      │
+│              │         │              │         │              │
+│  Port 8080   │         │  Port 3000   │         │              │
+└──────┬───────┘         └──────┬───────┘         └──────┬───────┘
+       │                        │                        │
+       │ PXE + Sequencer        │ REST API               │ Scripts
+       │                        │                        │
+       ├────────────────────────┼────────────────────────┤
+       │                        │                        │
+       ▼                        ▼                        ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                        Data Flow                                 │
+│                                                                   │
+│  1. CREATE INVOICE (Sender)                                      │
+│     CLI → InvoiceRegistry.create_invoice()                       │
+│         → Generates partial note commitment (on-chain)           │
+│         → CLI fetches partial note hash                          │
+│         → CLI → API (stores invoice + partial note hash)         │
+│                                                                   │
+│  2. PAY INVOICE (Payer)                                          │
+│     CLI → API (fetch pending invoice)                            │
+│         → Gets partial note hash from API                        │
+│         → CLI → Token.transfer_private_to_commitment()           │
+│         → Completes partial note (funds to sender)               │
+│         → CLI → InvoiceRegistry.pay_invoice()                    │
+│         → Marks invoice as paid (on-chain)                       │
+│         → CLI → API (update status to "paid")                    │
+│                                                                   │
+│  3. VERIFY PAYMENT                                               │
+│     CLI → InvoiceRegistry.is_paid()                              │
+│         → Checks public storage (is_paid_status)                 │
+│         → Returns true/false                                     │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│                     Storage Architecture                         │
+└─────────────────────────────────────────────────────────────────┘
+
+BLOCKCHAIN (Aztec)
+├── InvoiceRegistry Contract
+│   ├── Private Storage (Encrypted)
+│   │   └── invoice_details_map: Map<Field, PrivateImmutable<InvoiceDetails>>
+│   │       ├── sender_address (hidden)
+│   │       ├── title_hash (hidden)
+│   │       └── metadata (hidden)
+│   │
+│   └── Public Storage (Visible to All)
+│       ├── partial_notes: Map<Field, PublicMutable<Field>>
+│       ├── token_addresses: Map<Field, PublicMutable<AztecAddress>>
+│       ├── amounts: Map<Field, PublicMutable<u128>>
+│       ├── title_hashes: Map<Field, PublicMutable<Field>>
+│       └── is_paid_status: Map<Field, PublicMutable<bool>>
+│
+└── Token Contract (USDC)
+    ├── Private Balances (Encrypted per user)
+    └── Partial Note Commitments (for incomplete transfers)
+
+OFF-CHAIN (SQLite)
+└── Invoice API Database
+    └── invoices table
+        ├── invoiceId
+        ├── registryAddress
+        ├── senderAddress
+        ├── partialNoteHash (critical for payment!)
+        ├── title
+        ├── tokenAddress
+        ├── amount
+        ├── status (pending/paid)
+        ├── metadata
+        └── createdAt
+```
+
+### Key Components
+
+1. **Aztec Sandbox** (Terminal 1)
+   - Local Aztec blockchain
+   - PXE (Private Execution Environment) for managing private state
+   - Sequencer for block production
+   - JSON-RPC endpoint at http://localhost:8080
+
+2. **Invoice API** (Terminal 2)
+   - Bun HTTP server
+   - SQLite database for invoice storage
+   - REST endpoints for CRUD operations
+   - Tracks invoice status and metadata
+   - Serves at http://localhost:3000
+
+3. **CLI Scripts** (Terminal 3)
+   - TypeScript scripts for interacting with contracts
+   - Uses generated contract bindings
+   - Manages wallets and accounts
+   - Demonstrates full invoice workflow
+
 ## 📦 Packages
 
 ### 1. 📄 Contracts (`packages/contracts`)
@@ -30,7 +134,7 @@ Aztec Noir smart contracts implementing the invoice registry with privacy-preser
 **Usage:**
 ```bash
 # Terminal 1: Start Aztec Sandbox
-bun run sandbox
+aztec start --sandbox
 
 # Terminal 2: Build and run tests
 cd packages/contracts
@@ -67,13 +171,22 @@ A command-line interface demonstrating the complete invoice workflow with two pa
 - **Payer** (Wallet #1): Receives invoice link and pays 1000 USDC
 
 **Available Commands:**
-- `bun run setup:deploy`: Deploy token contracts and mint initial balances
-- `bun run setup:mint`: Mint additional tokens to participants
-- `bun run setup:accounts`: Setup and configure accounts
-- `bun run deploy:registry`: Deploy InvoiceRegistry contract (one-time)
-- `bun run invoice:create`: Create a new invoice (sender)
-- `bun run invoice:pay`: Pay an existing invoice (payer)
-- `bun run balances`: Check token balances of all participants
+
+**Setup Commands:**
+- `bun run deploy`: Deploy USDC token contract
+- `bun run setup:mint`: Mint 50,000 USDC to payer account
+- `bun run setup:accounts`: Setup and configure accounts (testnet only)
+
+**Invoice Commands:**
+- `bun run invoice:create`: Create a new invoice (sender perspective)
+- `bun run invoice:pay`: Pay a pending invoice (payer perspective)
+- `bun run invoice:check-db`: View all invoices in API database
+- `bun run invoice:get-onchain <id>`: Query invoice data from blockchain
+- `bun run invoice:fix-partial-notes`: Fix invoices with invalid partial notes (migration tool)
+
+**Utility Commands:**
+- `bun run balances`: Check USDC balances of sender and payer
+- `bun run cleanup`: Clean up deployment files and reset state
 
 **Complete Workflow:**
 
@@ -204,6 +317,7 @@ bun run api:dev  # Development mode with auto-reload
 
 - [Bun](https://bun.sh) runtime (v1.1.22+)
 - [Aztec CLI](https://docs.aztec.network/guides/developer_guides/getting_started/quickstart) for sandbox and PXE
+- [Docker](https://www.docker.com/) (for Aztec Sandbox)
 
 ### Installation
 
@@ -216,59 +330,216 @@ cd zk-invoice
 bun install
 ```
 
-### Development Setup
+### Complete Setup Guide
 
-**⚠️ Important: You MUST run the orderflow service for the demo to work properly!**
+Follow these steps to get the entire system running. You'll need **3 terminals**.
 
-#### Step-by-Step Setup (2 Terminals Required)
+#### Step 1: Build Contracts (Required First!)
 
-**⚠️ Prerequisites: Build contracts first!**
 ```bash
-bun install
+# In the project root
 cd packages/contracts
-bun run build      # REQUIRED: Build contracts before starting services
-cd -
+bun install
+bun run build      # Compiles Noir contracts and generates TypeScript bindings
+cd ../..
 ```
 
-1. **Terminal 1 - Start Aztec Sandbox:**
+**What this does:**
+- Compiles Aztec Noir smart contracts (`InvoiceRegistry`)
+- Generates TypeScript artifacts and bindings
+- Must be done before starting any services
+
+#### Step 2: Start Aztec Sandbox (Terminal 1)
+
 ```bash
-bun run sandbox
+# Terminal 1 - Keep this running
+aztec start --sandbox
 ```
 
-4. **Terminal 2 - Deploy Contracts & Run Demo:**
+**Wait for:** `Aztec Server listening on port 8080`
+
+**What this does:**
+- Starts local Aztec blockchain (Sandbox)
+- Runs PXE (Private Execution Environment)
+- Provides JSON-RPC endpoint at `http://localhost:8080`
+
+**Troubleshooting:**
+- If sandbox gets stuck (no new blocks), restart it: `docker ps` then `docker restart <container_id>`
+
+#### Step 3: Start Invoice API (Terminal 2)
+
 ```bash
+# Terminal 2 - Keep this running
+cd packages/api
+bun install
+bun run dev        # Development mode with hot reload
+```
+
+**Wait for:** `🚀 Invoice API listening on port 3000`
+
+**What this does:**
+- Starts RESTful HTTP server on `http://localhost:3000`
+- Manages invoice data in SQLite database
+- Provides endpoints for invoice creation, payment tracking, and queries
+
+**Troubleshooting:**
+- If you see "disk I/O error", restart the API
+- Database file: `packages/api/invoices.sqlite`
+
+#### Step 4: Deploy Contracts & Run Demo (Terminal 3)
+
+Now that both services are running, deploy contracts and create/pay invoices:
+
+```bash
+# Terminal 3 - Run commands here
 cd packages/cli
-bun run setup:deploy    # Deploy token contracts
-bun run setup:mint      # Mint tokens to payer account ⭐ REQUIRED
-bun run balances        # Check balances after minting
-bun run invoice:create  # Create invoice (sender)
-bun run invoice:pay     # Pay invoice (payer)
-bun run balances        # Check final balances
+bun install
+
+# 1. Deploy Token Contract (USDC) - Run once per sandbox session
+bun run setup:deploy
+# This creates USDC token and saves address to scripts/data/deployments.json
+
+# 2. Deploy Invoice Registry - Run once per sandbox session
+bun run deploy:registry
+# This creates the InvoiceRegistry contract and saves address to scripts/data/deployments.json
+
+# 3. Mint tokens to payer - Required before paying invoices
+bun run setup:mint
+# This gives the payer 50,000 USDC to pay invoices
+
+# 4. Check initial balances
+bun run balances
+# Should show: Payer = 50,000 USDC, Sender = 0 USDC
+
+# 5. Create an invoice (as sender)
+bun run invoice:create
+# This creates an invoice requesting 1,000 USDC
+# Stores invoice in API with valid partial note hash
+
+# 6. Verify invoice in database
+bun run invoice:check-db
+# Should show invoice with "✅ Valid partial note hash"
+
+# 7. Pay the invoice (as payer)
+bun run invoice:pay
+# Completes the partial note and transfers 1,000 USDC to sender
+# Marks invoice as paid in API
+
+# 8. Check final balances
+bun run balances
+# Should show: Payer = 49,000 USDC, Sender = 1,000 USDC
+```
+
+### 🔄 Quick Restart (After Stopping Sandbox)
+
+If you stop and restart the Aztec Sandbox, you'll need to redeploy:
+
+```bash
+# Terminal 1: Restart Aztec Sandbox
+aztec start --sandbox
+
+# Terminal 2: Restart Invoice API
+cd packages/api
+bun run dev
+
+# Terminal 3: Redeploy everything
+cd packages/cli
+bun run setup:deploy      # Redeploy token
+bun run deploy:registry   # Redeploy registry
+bun run setup:mint        # Mint tokens again
+bun run balances          # Verify balances
+
+# Now you can create and pay invoices again
+bun run invoice:create
+bun run invoice:pay
+```
+
+### 📝 Environment Variables
+
+Create a `.env` file in the project root:
+
+```bash
+# Local Sandbox (default)
+L2_NODE_URL=http://localhost:8080
+API_URL=http://localhost:3000
+
+# Optional: For testnet deployment
+# L2_NODE_URL=https://api.aztec.network
+# API_URL=https://your-api-url.com
 ```
 
 ## 🔧 Development
 
 ### Building Contracts
 
+After making changes to Noir contracts in `packages/contracts/src/`, you must rebuild:
+
 ```bash
 cd packages/contracts
-bun run build
+bun run build          # Compiles and generates TypeScript bindings
 ```
+
+**What happens during build:**
+1. `aztec-nargo compile` - Compiles Noir contracts
+2. `aztec-cli generate-bindings` - Generates TypeScript artifacts
+3. Updates `target/` folder with JSON artifacts
+4. Updates `ts/src/artifacts/` with TypeScript bindings
 
 ### Running Tests
 
 ```bash
-# Contract tests (requires running sandbox)
+# Contract tests (requires running sandbox in Terminal 1)
 cd packages/contracts
-bun test                # Run JS (PXE) tests
+bun test                # Run JS/TS (PXE) tests
 bun run test:nr         # Run Noir (TXE) tests
 bun run test            # Run all contract tests
 
-# Orderflow service tests
+# API service tests (standalone, no sandbox needed)
 cd packages/api
-bun test
+bun test                    # All tests
+bun run test:db             # Database tests only
+bun run test:handlers       # Handler tests only
+bun run test:integration    # Integration tests
 
-# All tests can be run independently
+# CLI scripts (requires sandbox + API running)
+cd packages/cli
+bun run balances        # Check balances
+bun run invoice:check-db # Check database state
+```
+
+### Common Development Tasks
+
+#### Recompile After Contract Changes
+```bash
+cd packages/contracts
+bun run build
+# Then restart any CLI scripts using the updated contract
+```
+
+#### Reset Local Database
+```bash
+# If invoices get corrupted or you want to start fresh
+rm packages/api/invoices.sqlite
+# Restart the API in Terminal 2
+```
+
+#### View Sandbox Logs
+```bash
+# Check Docker logs for Aztec Sandbox
+docker ps                          # Find container ID
+docker logs -f <container_id>      # Follow logs
+```
+
+#### Restart Sandbox (If Stuck)
+```bash
+# Find and restart the sandbox container
+docker ps
+docker restart <container_id>
+
+# Then redeploy contracts in Terminal 3
+cd packages/cli
+bun run setup:deploy
+bun run deploy:registry
 ```
 
 ### Project Structure
@@ -292,16 +563,159 @@ zk-invoice/
 └── scripts/                # Root-level utility scripts
 ```
 
+## 🐛 Troubleshooting
+
+### "Aztec Server listening on port 8080" never appears
+**Problem:** Sandbox failed to start or port is already in use
+
+**Solution:**
+```bash
+# Check if port 8080 is already in use
+lsof -i :8080
+
+# Kill any process using port 8080
+kill -9 <PID>
+
+# Or restart Docker
+docker ps
+docker stop <container_id>
+aztec start --sandbox
+```
+
+### "Registry contract not deployed"
+**Problem:** Trying to create invoice before deploying registry
+
+**Solution:**
+```bash
+cd packages/cli
+bun run deploy:registry
+```
+
+### "Insufficient balance" when paying invoice
+**Problem:** Payer doesn't have enough tokens
+
+**Solution:**
+```bash
+cd packages/cli
+bun run setup:mint      # Mint 50,000 USDC to payer
+bun run balances        # Verify balance
+```
+
+### "Partial Note Hash: 0x0" in database
+**Problem:** Invoice created with invalid partial note (old bug)
+
+**Solution:**
+```bash
+# Option 1: Clear database and create fresh invoices
+rm packages/api/invoices.sqlite
+# Restart API in Terminal 2
+cd packages/api
+bun run dev
+
+# Option 2: Fix existing invoices
+cd packages/cli
+bun run invoice:fix-partial-notes
+```
+
+### "Nullifier witness not found"
+**Problem:** PXE out of sync or trying to spend note it doesn't know about
+
+**Solution:**
+```bash
+# 1. Wait longer (PXE needs time to sync)
+# Scripts already include delays, but if issue persists:
+
+# 2. Restart sandbox
+docker ps
+docker restart <container_id>
+
+# 3. Redeploy and try again
+cd packages/cli
+bun run setup:deploy
+bun run deploy:registry
+bun run setup:mint
+```
+
+### "fatal: not a git repository" during bun install
+**Problem:** Broken git submodule reference in `deps/aztec-standards`
+
+**Solution:**
+```bash
+# The postinstall script is already configured to skip submodules
+# If you see this error, the fix has already been applied
+# Just run bun install again:
+bun install
+
+# Alternative: Manually fix the submodule
+git submodule deinit -f deps/aztec-standards
+git submodule update --init --recursive
+```
+
+### "disk I/O error" from API
+**Problem:** SQLite database locked or corrupted
+
+**Solution:**
+```bash
+# Stop API (Ctrl+C in Terminal 2)
+# Remove database
+rm packages/api/invoices.sqlite
+# Restart API
+cd packages/api
+bun run dev
+```
+
+### Sandbox stuck (no new blocks)
+**Problem:** Local sandbox not producing blocks
+
+**Solution:**
+```bash
+# Find container
+docker ps | grep aztec
+
+# Restart container
+docker restart <container_id>
+
+# Wait for "Aztec Server listening on port 8080"
+# Then redeploy contracts
+cd packages/cli
+bun run setup:deploy
+bun run deploy:registry
+```
+
+### "Payment verification failed"
+**Problem:** Payment succeeded but verification shows as failed (timing issue)
+
+**Solution:**
+- This is a known issue with public state propagation
+- The payment actually succeeded (check with `bun run balances`)
+- The verification step may need more time
+- **Workaround:** Check balance manually, ignore verification warning
+
+### Contract changes not reflected
+**Problem:** Modified Noir contract but CLI scripts still use old version
+
+**Solution:**
+```bash
+# Rebuild contracts
+cd packages/contracts
+bun run build
+
+# Then redeploy
+cd ../cli
+bun run deploy:registry
+```
+
 ## 🔐 Privacy Features
 
-This Invoice desk leverages Aztec's advanced privacy features to ensure confidential trading:
+This Invoice platform leverages Aztec's advanced privacy features:
 
 - **Private Balances**: Token balances remain completely private and hidden from public view
-- **Confidential Transfers**: Transfer amounts, recipients, and transaction details are kept confidential
-- **Selective Disclosure**: Traders maintain full control over what information to reveal and when
-- **Zero-Knowledge Proofs**: All operations are cryptographically verified without revealing sensitive trading data
-- **Trustless Escrow**: Atomic swaps provide secure, trustless asset exchanges without intermediaries
-- **Private Order Books**: Order details remain confidential until parties choose to execute trades
+- **Confidential Payments**: Payment amounts and sender addresses are encrypted on-chain
+- **Partial Note Commitments**: Enable private payment flows where payer completes note without knowing recipient
+- **Zero-Knowledge Proofs**: All operations are cryptographically verified without revealing sensitive data
+- **Encrypted Notes**: Invoice details stored as encrypted notes, only readable with viewing keys
+- **Nullifier-Based**: Prevents double-payment using nullifier tree
+- **Hybrid Storage**: Public payment info (for payer) + Private sender details (encrypted)
 
 ## 🛠️ Technology Stack
 

@@ -33,6 +33,9 @@ pub contract InvoiceRegistry {
         token_addresses: Map<Field, PublicMutable<AztecAddress, Context>, Context>,
         amounts: Map<Field, PublicMutable<u128, Context>, Context>,
         title_hashes: Map<Field, PublicMutable<Field, Context>, Context>,
+        
+        // PUBLIC: Track payment status (0 = unpaid, 1 = paid)
+        payment_status: Map<Field, PublicMutable<bool, Context>, Context>,
     }
     
     /**
@@ -134,8 +137,22 @@ pub contract InvoiceRegistry {
         let payment_nullifier = compute_payment_nullifier(invoice_id, context.this_address());
         context.push_nullifier(payment_nullifier);
         
+        // Mark invoice as paid in public storage
+        InvoiceRegistry::at(context.this_address())
+            ._mark_paid(invoice_id)
+            .enqueue(&mut context);
+        
         // TODO: Emit event for API tracking
         // Events in private functions are not yet fully supported, so we skip this for now
+    }
+
+    /**
+     * Internal function to mark an invoice as paid in public storage
+     * Called from pay_invoice via enqueue
+     */
+    #[external("public")]
+    fn _mark_paid(invoice_id: Field) {
+        storage.payment_status.at(invoice_id).write(true);
     }
 
     /**
@@ -146,10 +163,7 @@ pub contract InvoiceRegistry {
      */
     #[external("utility")]
     unconstrained fn is_paid(invoice_id: Field) -> pub bool {
-        let nullifier = compute_payment_nullifier(invoice_id, context.this_address());
-        // For now return false - proper nullifier checking requires oracle setup
-        // TODO: Implement proper nullifier existence check
-        false
+        storage.payment_status.at(invoice_id).read()
     }
 
     /**

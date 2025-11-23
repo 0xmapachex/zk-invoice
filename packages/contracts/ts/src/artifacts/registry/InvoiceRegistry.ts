@@ -90,7 +90,7 @@ export class InvoiceRegistryContract extends ContractBase {
   }
   
 
-  public static get storage(): ContractStorageLayout<'private_invoices' | 'partial_notes' | 'token_addresses' | 'amounts' | 'title_hashes'> {
+  public static get storage(): ContractStorageLayout<'private_invoices' | 'partial_notes' | 'token_addresses' | 'amounts' | 'title_hashes' | 'payment_status'> {
       return {
         private_invoices: {
       slot: new Fr(1n),
@@ -106,14 +106,20 @@ amounts: {
     },
 title_hashes: {
       slot: new Fr(5n),
+    },
+payment_status: {
+      slot: new Fr(6n),
     }
-      } as ContractStorageLayout<'private_invoices' | 'partial_notes' | 'token_addresses' | 'amounts' | 'title_hashes'>;
+      } as ContractStorageLayout<'private_invoices' | 'partial_notes' | 'token_addresses' | 'amounts' | 'title_hashes' | 'payment_status'>;
     }
     
 
   /** Type-safe wrappers for the public methods exposed by the contract. */
   public declare methods: {
     
+    /** _mark_paid(invoice_id: field) */
+    _mark_paid: ((invoice_id: FieldLike) => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
+
     /** _store_payment_info(invoice_id: field, partial_note: field, token_address: struct, amount: integer, title_hash: field) */
     _store_payment_info: ((invoice_id: FieldLike, partial_note: FieldLike, token_address: AztecAddressLike, amount: (bigint | number), title_hash: FieldLike) => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
 

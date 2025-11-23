@@ -201,6 +201,9 @@ const main = async () => {
     throw lastError || new Error("Payment failed after all retries");
   }
 
+  // Wait a bit for public execution to complete (payment status update)
+  await new Promise(resolve => setTimeout(resolve, 2000));
+
   // verify payment was successful
   console.log("Verifying payment...");
   const isPaid = await isInvoicePaid(wallet, payerAddress, registry, invoiceId);
