@@ -40,13 +40,11 @@ const main = async () => {
         instance: ContractInstanceWithAddressSchema.parse(registryDeploymentRaw.instance)
     };
     const registryAddress = AztecAddress.fromString(registryDeployment.address);
-    const registrySecretKey = Fr.fromString(registryDeployment.secretKey);
     const registry = await getInvoiceRegistry(
         wallet,
         senderAddress,
         registryAddress,
-        registryDeployment.instance,
-        registrySecretKey
+        registryDeployment.instance
     );
 
     try {
@@ -66,8 +64,8 @@ const main = async () => {
         const isPaid = await registry.methods.is_paid(invoiceId).simulate({ from: senderAddress });
         console.log(`  Status:          ${isPaid ? "✅ PAID" : "⏳ PENDING"}`);
 
-        // 3. Get PRIVATE invoice data (only sender with viewing keys can read)
-        console.log("\n🔒 PRIVATE INVOICE DATA (encrypted, only sender can read):");
+        // 3. Get PRIVATE invoice data (only invoice creator can read)
+        console.log("\n🔒 PRIVATE INVOICE DATA (encrypted with per-user keys):");
         console.log("================================================");
         try {
             const invoiceNote = await registry.methods.get_invoice(invoiceId).simulate({ from: senderAddress });
@@ -77,8 +75,8 @@ const main = async () => {
             console.log(`  Invoice ID:      ${invoiceNote.invoice_id}`);
             console.log(`  Randomness:      ${invoiceNote.randomness}`);
         } catch (error: any) {
-            console.log(`  ⚠️  Cannot read private data (viewing keys not available)`);
-            console.log(`  This is expected if you're not the sender!`);
+            console.log(`  ⚠️  Cannot read private data`);
+            console.log(`  This is expected! Only the invoice creator can decrypt their private notes.`);
         }
 
         console.log("\n✅ Query complete!\n");
