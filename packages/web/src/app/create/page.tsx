@@ -152,21 +152,34 @@ export default function CreateInvoicePage() {
   };
   
   return (
-    <div className="container mx-auto py-8 px-4 max-w-4xl">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Create New Invoice</h1>
-        <p className="text-muted-foreground mt-1">
-          Fill in the details to create a new invoice
-        </p>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-background via-primary/[0.02] to-purple-500/[0.03] relative overflow-hidden">
+      {/* Animated Background */}
+      <div className="absolute inset-0 bg-dots-pattern opacity-30"></div>
+      <div className="absolute top-20 right-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl animate-float"></div>
+      <div className="absolute bottom-20 left-0 w-96 h-96 bg-purple-500/5 rounded-full blur-3xl animate-float animation-delay-400"></div>
+      
+      <div className="container mx-auto py-8 px-4 lg:px-6 max-w-5xl relative z-10">
+        <div className="mb-8 opacity-0 animate-fade-in-down">
+          <h1 className="text-3xl lg:text-4xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
+            Create New Invoice
+          </h1>
+          <p className="text-muted-foreground mt-2 text-base">
+            Fill in the details to create a new zero-knowledge protected invoice
+          </p>
+        </div>
       
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         {/* Bill From (Auto-filled) */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Bill From</CardTitle>
+        <Card className="shadow-lg border-border/50 bg-card/50 backdrop-blur-sm opacity-0 animate-fade-in-up animation-delay-200 hover:shadow-xl transition-all duration-300 hover:scale-[1.01]">
+          <CardHeader className="border-b bg-muted/30">
+            <CardTitle className="flex items-center gap-2">
+              <svg className="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              Bill From
+            </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-6">
             <div className="space-y-4">
               <div>
                 <Label>Sender Address</Label>
@@ -181,11 +194,16 @@ export default function CreateInvoicePage() {
         </Card>
         
         {/* Bill To */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Bill To</CardTitle>
+        <Card className="shadow-lg border-border/50 bg-card/50 backdrop-blur-sm opacity-0 animate-fade-in-up animation-delay-400 hover:shadow-xl transition-all duration-300 hover:scale-[1.01]">
+          <CardHeader className="border-b bg-muted/30">
+            <CardTitle className="flex items-center gap-2">
+              <svg className="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+              Bill To
+            </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 pt-6">
             <div>
               <Label htmlFor="clientName">Client Name *</Label>
               <Input
@@ -223,11 +241,16 @@ export default function CreateInvoicePage() {
         </Card>
         
         {/* Invoice Details */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Invoice Details</CardTitle>
+        <Card className="shadow-lg border-border/50 bg-card/50 backdrop-blur-sm opacity-0 animate-fade-in-up animation-delay-600 hover:shadow-xl transition-all duration-300 hover:scale-[1.01]">
+          <CardHeader className="border-b bg-muted/30">
+            <CardTitle className="flex items-center gap-2">
+              <svg className="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Invoice Details
+            </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 pt-6">
             <div>
               <Label htmlFor="title">Invoice Title *</Label>
               <Input
@@ -253,20 +276,26 @@ export default function CreateInvoicePage() {
         </Card>
         
         {/* Line Items */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0">
-            <CardTitle>Line Items</CardTitle>
+        <Card className="shadow-lg border-border/50 bg-card/50 backdrop-blur-sm opacity-0 animate-fade-in-up animation-delay-800 hover:shadow-xl transition-all duration-300 hover:scale-[1.01]">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b bg-muted/30">
+            <CardTitle className="flex items-center gap-2">
+              <svg className="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+              </svg>
+              Line Items
+            </CardTitle>
             <Button
               type="button"
               variant="outline"
               size="sm"
               onClick={() => append({ description: "", quantity: 1, unitPrice: 100 })}
+              className="shadow-sm hover:shadow-md transition-all"
             >
               <Plus className="h-4 w-4 mr-2" />
               Add Item
             </Button>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-6">
             <div className="space-y-4">
               {fields.map((field, index) => (
                 <div key={field.id} className="flex gap-4 items-start">
@@ -332,38 +361,54 @@ export default function CreateInvoicePage() {
               )}
               
               {/* Totals */}
-              <div className="pt-4 border-t space-y-2">
-                <div className="flex justify-between text-lg font-semibold">
-                  <span>Total:</span>
-                  <span>${subtotal.toFixed(2)}</span>
+              <div className="pt-6 border-t space-y-3">
+                <div className="flex justify-between items-center bg-primary/5 rounded-lg p-4">
+                  <span className="text-lg font-semibold">Total Amount:</span>
+                  <span className="text-2xl font-bold text-primary">${subtotal.toFixed(2)}</span>
                 </div>
+                <p className="text-xs text-muted-foreground text-center">
+                  This invoice will be secured with zero-knowledge cryptography
+                </p>
               </div>
             </div>
           </CardContent>
         </Card>
         
         {/* Actions */}
-        <div className="flex justify-end gap-4">
+        <div className="flex flex-col sm:flex-row justify-end gap-4 pt-4 opacity-0 animate-fade-in-up animation-delay-800">
           <Button
             type="button"
             variant="outline"
-            onClick={() => router.push("/")}
+            size="lg"
+            onClick={() => router.push("/dashboard")}
             disabled={isSubmitting}
+            className="shadow-sm"
           >
             Cancel
           </Button>
-          <Button type="submit" disabled={isSubmitting}>
+          <Button 
+            type="submit" 
+            disabled={isSubmitting}
+            size="lg"
+            className="shadow-lg hover:shadow-xl transition-all"
+          >
             {isSubmitting ? (
               <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Creating...
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                Creating Invoice...
               </>
             ) : (
-              "Create Invoice"
+              <>
+                <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Create Invoice
+              </>
             )}
           </Button>
         </div>
       </form>
+      </div>
     </div>
   );
 }

@@ -32,14 +32,19 @@ export function InvoiceFilter() {
   
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-2 flex-wrap">
           {FILTER_TABS.map((tab) => (
             <Button
               key={tab.value}
               variant={filters.status === tab.value ? "default" : "outline"}
               size="sm"
               onClick={() => handleTabChange(tab.value)}
+              className={`transition-all duration-300 ${
+                filters.status === tab.value 
+                  ? "shadow-lg shadow-primary/20" 
+                  : "hover:scale-105 hover:border-primary/50"
+              }`}
             >
               {tab.label}
             </Button>
@@ -47,7 +52,10 @@ export function InvoiceFilter() {
         </div>
         
         {role === "seller" && (
-          <Button onClick={handleCreateInvoice}>
+          <Button 
+            onClick={handleCreateInvoice}
+            className="shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
+          >
             <Plus className="h-4 w-4 mr-2" />
             Create Invoice
           </Button>
@@ -60,7 +68,7 @@ export function InvoiceFilter() {
           placeholder="Search invoices..."
           value={filters.search || ""}
           onChange={handleSearch}
-          className="pl-10"
+          className="pl-10 bg-card/50 backdrop-blur-sm border-border/50 focus:border-primary transition-all duration-300 hover:shadow-md focus:shadow-lg"
         />
       </div>
     </div>

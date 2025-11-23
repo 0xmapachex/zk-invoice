@@ -44,6 +44,12 @@ export function Header() {
               href="/" 
               className="text-sm font-medium transition-colors hover:text-primary"
             >
+              Home
+            </Link>
+            <Link 
+              href="/dashboard" 
+              className="text-sm font-medium transition-colors hover:text-primary"
+            >
               Dashboard
             </Link>
             {role === "seller" && (
@@ -101,6 +107,13 @@ export function Header() {
             <nav className="flex flex-col gap-2">
               <Link
                 href="/"
+                className="text-sm font-medium px-2 py-1 hover:bg-accent rounded-md"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Home
+              </Link>
+              <Link
+                href="/dashboard"
                 className="text-sm font-medium px-2 py-1 hover:bg-accent rounded-md"
                 onClick={() => setMobileMenuOpen(false)}
               >

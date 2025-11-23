@@ -1,5 +1,6 @@
-
+import "dotenv/config";
 import { createInvoiceHandlers } from "./handlers";
+import { createBlockchainHandlers } from "./handlers/blockchainHandlers";
 import { SQLiteDatabase } from "./db";
 
 /**
@@ -20,6 +21,13 @@ const main = async () => {
     handleUpdateInvoice,
     handleMarkPaid
   } = createInvoiceHandlers(database);
+  
+  const {
+    handleCreateInvoiceOnChain,
+    handlePayInvoiceOnChain,
+    handleGetBalance,
+    handleMintTokens,
+  } = createBlockchainHandlers(database);
   
   const server = Bun.serve({
     port: 3000,
@@ -74,6 +82,26 @@ const main = async () => {
       // /invoice/paid endpoint - marks invoice as paid
       if (url.pathname === "/invoice/paid" && req.method === "POST") {
         return addCorsHeaders(await handleMarkPaid(req));
+      }
+
+      // /blockchain/invoice/create endpoint - create invoice on-chain
+      if (url.pathname === "/blockchain/invoice/create" && req.method === "POST") {
+        return addCorsHeaders(await handleCreateInvoiceOnChain(req));
+      }
+
+      // /blockchain/invoice/pay endpoint - pay invoice on-chain
+      if (url.pathname === "/blockchain/invoice/pay" && req.method === "POST") {
+        return addCorsHeaders(await handlePayInvoiceOnChain(req));
+      }
+
+      // /blockchain/balance/:tokenAddress/:accountAddress endpoint - get balance
+      if (url.pathname.startsWith("/blockchain/balance/") && req.method === "GET") {
+        return addCorsHeaders(await handleGetBalance(req));
+      }
+
+      // /blockchain/mint endpoint - mint tokens to account
+      if (url.pathname === "/blockchain/mint" && req.method === "POST") {
+        return addCorsHeaders(await handleMintTokens(req));
       }
 
       // healthcheck endpoint

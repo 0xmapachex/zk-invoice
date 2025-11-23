@@ -141,14 +141,6 @@ cd packages/contracts
 bun install
 bun run build
 
-## Run the TXE tests
-bun run test:nr
-## Run the PXE tests
-bun test
-## Run both tests
-bun run test
-```
-
 **Privacy Architecture:**
 ```
 ┌─────────────────────┐

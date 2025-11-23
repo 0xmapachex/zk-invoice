@@ -1,204 +1,142 @@
-// Transaction Helpers - Create and pay invoices on-chain
-// Based on packages/cli/scripts/create_invoice.ts and pay_invoice.ts
-
-import { createInvoiceInAPI as registerInvoiceInAPI } from "@/lib/api/client";
-
 /**
- * Create invoice on-chain and register in API
- * Mirrors the flow from packages/cli/scripts/create_invoice.ts
+ * Aztec Transaction Operations
+ * 
+ * Calls the API's blockchain endpoints to execute transactions server-side.
  */
-export async function createInvoiceOnChain(params: {
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+
+interface CreateInvoiceParams {
   wallet: any;
-  senderAddress: any;
+  senderAddress: string;
   registry: any;
   node: any;
   title: string;
   amount: bigint;
-  tokenAddress: any;
+  tokenAddress: string;
   metadata: string;
-}) {
-  const { wallet, senderAddress, registry, node, title, amount, tokenAddress, metadata } = params;
-  
-  // TODO: Add after fixing workspace dependencies
-  // const { Fr } = await import("@aztec/aztec.js/fields");
-  // const { createInvoice } = await import("@zk-invoice/contracts/contract");
-  // const { AztecAddress } = await import("@aztec/aztec.js/addresses");
-  // 
-  // // Generate invoice ID
-  // const invoiceId = Fr.random();
-  // 
-  // // Hash title and metadata
-  // const titleHash = Fr.random(); // TODO: Proper hash
-  // const metadataField = Fr.random(); // TODO: Proper encoding
-  // 
-  // // Create invoice on-chain
-  // const txHash = await createInvoice(
-  //   wallet,
-  //   senderAddress,
-  //   registry,
-  //   invoiceId,
-  //   titleHash,
-  //   tokenAddress,
-  //   amount,
-  //   metadataField,
-  //   { send: { from: senderAddress } }
-  // );
-  // 
-  // // Wait for transaction
-  // console.log("Transaction sent:", txHash);
-  // 
-  // // Wait for public execution to complete
-  // await new Promise(resolve => setTimeout(resolve, 2000));
-  // 
-  // // Fetch partial note hash from blockchain
-  // let retries = 5;
-  // let partialNoteHash = "0x0";
-  // 
-  // for (let i = 0; i < retries; i++) {
-  //   const paymentInfo = await registry.methods
-  //     .get_payment_info(invoiceId)
-  //     .simulate({ from: senderAddress });
-  //   
-  //   partialNoteHash = paymentInfo.partial_note.toString();
-  //   
-  //   if (partialNoteHash !== "0" && partialNoteHash !== "0x0") {
-  //     break;
-  //   }
-  //   
-  //   if (i < retries - 1) {
-  //     console.log(`Waiting for partial note... (attempt ${i + 1}/${retries})`);
-  //     await new Promise(resolve => setTimeout(resolve, 1000));
-  //   }
-  // }
-  // 
-  // if (partialNoteHash === "0" || partialNoteHash === "0x0") {
-  //   throw new Error("Failed to get partial note hash from blockchain");
-  // }
-  // 
-  // // Register in API
-  // await registerInvoiceInAPI({
-  //   invoiceId: invoiceId.toString(),
-  //   registryAddress: registry.address.toString(),
-  //   senderAddress: senderAddress.toString(),
-  //   partialNoteHash,
-  //   title,
-  //   tokenAddress: tokenAddress.toString(),
-  //   amount: amount.toString(),
-  //   metadata,
-  // });
-  // 
-  // return {
-  //   invoiceId: invoiceId.toString(),
-  //   txHash,
-  //   partialNoteHash,
-  // };
-  
-  // Temporary mock implementation
-  console.log("Would create invoice on-chain with:", {
-    title,
-    amount: amount.toString(),
-    tokenAddress,
-  });
-  
-  // For now, just register in API with mock data
-  const invoiceId = `0x${Math.random().toString(16).substring(2)}`;
-  await registerInvoiceInAPI({
-    invoiceId,
-    registryAddress: "0x0000000000000000000000000000000000000000",
-    senderAddress: params.senderAddress || "0x0000000000000000000000000000000000000000",
-    partialNoteHash: "0x0",
-    title,
-    tokenAddress: tokenAddress || "0x0000000000000000000000000000000000000000",
-    amount: amount.toString(),
-    metadata,
-  });
-  
-  return {
-    invoiceId,
-    txHash: "0xmock",
-    partialNoteHash: "0x0",
-  };
 }
 
-/**
- * Pay invoice on-chain
- * Mirrors the flow from packages/cli/scripts/pay_invoice.ts
- */
-export async function payInvoiceOnChain(params: {
+interface PayInvoiceParams {
   wallet: any;
-  payerAddress: any;
+  payerAddress: string;
   registry: any;
   token: any;
   invoiceId: string;
   partialNote: string;
-  tokenAddress: any;
+  tokenAddress: string;
   amount: bigint;
-}) {
-  const { wallet, payerAddress, registry, token, invoiceId, partialNote, tokenAddress, amount } = params;
-  
-  // TODO: Add after fixing workspace dependencies
-  // const { Fr } = await import("@aztec/aztec.js/fields");
-  // const { AztecAddress } = await import("@aztec/aztec.js/addresses");
-  // const { payInvoice, getPrivateTransferToCommitmentAuthwit } = await import("@zk-invoice/contracts/contract");
-  // 
-  // // Check balance
-  // const balance = await token.methods
-  //   .balance_of_private(payerAddress)
-  //   .simulate({ from: payerAddress });
-  // 
-  // if (balance < amount) {
-  //   throw new Error(`Insufficient balance: ${balance} < ${amount}`);
-  // }
-  // 
-  // // Sync private state
-  // await token.methods.sync_private_state().simulate({ from: payerAddress });
-  // 
-  // // Create authwit for token transfer
-  // const { authwit, nonce } = await getPrivateTransferToCommitmentAuthwit(
-  //   wallet,
-  //   payerAddress,
-  //   token,
-  //   registry.address,
-  //   Fr.fromString(partialNote),
-  //   amount
-  // );
-  // 
-  // // Pay invoice
-  // const txHash = await payInvoice(
-  //   wallet,
-  //   payerAddress,
-  //   registry,
-  //   Fr.fromString(invoiceId),
-  //   Fr.fromString(partialNote),
-  //   token,
-  //   AztecAddress.fromString(tokenAddress.toString()),
-  //   amount,
-  //   { send: { from: payerAddress, authWitnesses: [authwit] } }
-  // );
-  // 
-  // // Wait for confirmation
-  // await new Promise(resolve => setTimeout(resolve, 2000));
-  // 
-  // // Verify payment
-  // const isPaid = await registry.methods
-  //   .is_paid(Fr.fromString(invoiceId))
-  //   .simulate({ from: payerAddress });
-  // 
-  // if (!isPaid) {
-  //   throw new Error("Payment verification failed");
-  // }
-  // 
-  // return { txHash };
-  
-  // Temporary mock implementation
-  console.log("Would pay invoice on-chain:", {
-    invoiceId,
-    amount: amount.toString(),
-  });
-  
-  // Simulate blockchain delays
-  await new Promise(resolve => setTimeout(resolve, 2000));
-  
-  return { txHash: "0xmock_payment" };
 }
+
+interface InvoiceResult {
+  invoiceId: string;
+  partialNoteHash: string;
+  txHash?: string;
+  registryAddress?: string;
+}
+
+/**
+ * Create an invoice on-chain via API
+ */
+export const createInvoiceOnChain = async (
+  params: CreateInvoiceParams
+): Promise<InvoiceResult> => {
+  console.log("Creating invoice on-chain via API...");
+  console.log("Invoice params:", {
+    title: params.title,
+    amount: params.amount.toString(),
+    tokenAddress: params.tokenAddress,
+  });
+
+  try {
+    const response = await fetch(`${API_URL}/blockchain/invoice/create`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        title: params.title,
+        amount: params.amount.toString(),
+        tokenAddress: params.tokenAddress,
+        metadata: params.metadata,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(
+        errorData.error || `Failed to create invoice: ${response.statusText}`
+      );
+    }
+
+    const result = await response.json();
+    
+    if (!result.success) {
+      throw new Error(result.error || "Failed to create invoice");
+    }
+
+    console.log("Invoice created successfully:", result.data);
+
+    return {
+      invoiceId: result.data.invoiceId,
+      partialNoteHash: result.data.partialNoteHash,
+      txHash: result.data.txHash,
+      registryAddress: result.data.registryAddress,
+    };
+  } catch (error) {
+    console.error("Error creating invoice on-chain:", error);
+    throw error;
+  }
+};
+
+/**
+ * Pay an invoice on-chain via API
+ */
+export const payInvoiceOnChain = async (
+  params: PayInvoiceParams
+): Promise<{ txHash: string }> => {
+  console.log("Paying invoice on-chain via API...");
+  console.log("Payment params:", {
+    invoiceId: params.invoiceId,
+    amount: params.amount.toString(),
+  });
+
+  try {
+    const response = await fetch(`${API_URL}/blockchain/invoice/pay`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        invoiceId: params.invoiceId,
+        partialNoteHash: params.partialNote,
+        tokenAddress: params.tokenAddress,
+        amount: params.amount.toString(),
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(
+        errorData.error || `Failed to pay invoice: ${response.statusText}`
+      );
+    }
+
+    const result = await response.json();
+
+    if (!result.success) {
+      throw new Error(result.error || "Failed to pay invoice");
+    }
+
+    console.log("Invoice paid successfully:", result.data);
+
+    return {
+      txHash: result.data.txHash,
+    };
+  } catch (error) {
+    console.error("Error paying invoice on-chain:", error);
+    throw error;
+  }
+};
+
 

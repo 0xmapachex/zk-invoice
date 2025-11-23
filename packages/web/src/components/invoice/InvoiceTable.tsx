@@ -37,25 +37,30 @@ export function InvoiceTable({ invoices, onDelete, onPay }: InvoiceTableProps) {
   
   if (invoices.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed p-8">
-        <div className="text-center">
-          <h3 className="text-lg font-semibold">No invoices found</h3>
-          <p className="text-sm text-muted-foreground mt-1">
-            {role === "seller" 
-              ? "Create your first invoice to get started"
-              : "No invoices received yet"
-            }
-          </p>
+      <div className="rounded-xl border border-dashed p-12 bg-card/50 backdrop-blur-sm">
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 rounded-full bg-muted/50 mx-auto flex items-center justify-center">
+            <Eye className="w-8 h-8 text-muted-foreground" />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold">No invoices found</h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              {role === "seller" 
+                ? "Create your first invoice to get started"
+                : "No invoices received yet"
+              }
+            </p>
+          </div>
         </div>
       </div>
     );
   }
   
   return (
-    <div className="rounded-lg border">
+    <div className="rounded-xl border border-border/50 overflow-hidden bg-card/50 backdrop-blur-sm shadow-lg">
       <Table>
-        <TableHeader>
-          <TableRow>
+        <TableHeader className="bg-muted/30">
+          <TableRow className="hover:bg-transparent">
             <TableHead>Invoice No.</TableHead>
             <TableHead>Date</TableHead>
             <TableHead>Title</TableHead>
@@ -72,7 +77,11 @@ export function InvoiceTable({ invoices, onDelete, onPay }: InvoiceTableProps) {
               : BigInt(invoice.amount);
               
             return (
-              <TableRow key={invoice.invoiceId}>
+              <TableRow 
+                key={invoice.invoiceId}
+                className="hover:bg-muted/30 transition-colors duration-200 cursor-pointer group"
+                onClick={() => handleView(invoice)}
+              >
                 <TableCell className="font-mono text-sm">
                   #{truncateAddress(invoice.invoiceId, 8, 6)}
                 </TableCell>

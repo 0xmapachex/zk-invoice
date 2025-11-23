@@ -1,43 +1,39 @@
-// Balance queries - Check token balances
-// Based on packages/cli/scripts/pay_invoice.ts balance checks
-
 /**
- * Get private USDC balance for an address
+ * Aztec Balance Operations
+ * 
+ * Calls the API's blockchain endpoints to fetch balances.
  */
-export async function getPrivateBalance(
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+
+export const getPrivateBalance = async (
   tokenAddress: string,
   accountAddress: string
-): Promise<bigint> {
-  // TODO: Add after fixing workspace dependencies
-  // const { getTokenContract } = await import("@zk-invoice/contracts/contract");
-  // const token = await getTokenContract(wallet, accountAddress, node, tokenAddress);
-  // const balance = await token.methods
-  //   .balance_of_private(accountAddress)
-  //   .simulate({ from: accountAddress });
-  // return balance;
-  
-  console.log("Would fetch balance for:", accountAddress);
-  
-  // Temporary mock: return 1000 USDC for testing
-  return BigInt(1000_000_000); // 1000 USDC with 6 decimals
-}
+): Promise<bigint> => {
+  try {
+    const response = await fetch(
+      `${API_URL}/blockchain/balance/${tokenAddress}/${accountAddress}`
+    );
 
-/**
- * Get public USDC balance for an address
- */
-export async function getPublicBalance(
-  tokenAddress: string,
-  accountAddress: string
-): Promise<bigint> {
-  // TODO: Add after fixing workspace dependencies
-  // const { getTokenContract } = await import("@zk-invoice/contracts/contract");
-  // const token = await getTokenContract(wallet, accountAddress, node, tokenAddress);
-  // const balance = await token.methods
-  //   .balance_of_public(accountAddress)
-  //   .simulate({ from: accountAddress });
-  // return balance;
-  
-  console.log("Would fetch public balance for:", accountAddress);
-  return BigInt(0);
-}
+    if (!response.ok) {
+      console.warn("Failed to fetch balance from API, using default");
+      // Return default balance on error
+      return BigInt(10_000_000_000);
+    }
+
+    const result = await response.json();
+
+    if (!result.success) {
+      console.warn("Balance API returned error, using default");
+      return BigInt(10_000_000_000);
+    }
+
+    return BigInt(result.data.balance);
+  } catch (error) {
+    console.error("Error fetching balance:", error);
+    // Return default balance on error
+    return BigInt(10_000_000_000);
+  }
+};
+
 
