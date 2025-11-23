@@ -28,6 +28,7 @@ const main = async () => {
     handlePayInvoiceOnChain,
     handleGetBalance,
     handleMintTokens,
+    handleGetAddresses,
   } = createBlockchainHandlers(database);
 
   const {
@@ -144,6 +145,11 @@ const main = async () => {
       // /blockchain/mint endpoint - mint tokens to account
       if (url.pathname === "/blockchain/mint" && req.method === "POST") {
         return addCorsHeaders(await handleMintTokens(req));
+      }
+
+      // /blockchain/addresses endpoint - get real wallet addresses
+      if (url.pathname === "/blockchain/addresses" && req.method === "GET") {
+        return addCorsHeaders(await handleGetAddresses(req));
       }
 
       // healthcheck endpoint

@@ -43,35 +43,28 @@ export const useWalletStore = create<WalletState>()(
         set({ role, currentAddress: newAddress });
       },
       
-      // Connect wallet (initialize accounts from env vars)
+      // Connect wallet (fetch real Aztec addresses from API)
       connect: async () => {
         set({ isConnecting: true });
         
         try {
-          // Generate deterministic addresses from env vars
-          // In production, these would be derived from actual Aztec secret keys
-          const sellerSecretKey = process.env.SELLER_SECRET_KEY || 
-            "0x0000000000000000000000000000000000000000000000000000000000000001";
-          const buyerSecretKey = process.env.BUYER_SECRET_KEY || 
-            "0x0000000000000000000000000000000000000000000000000000000000000002";
+          // Fetch real Aztec addresses from the blockchain API
+          const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+          const response = await fetch(`${API_URL}/blockchain/addresses`);
           
-          // Create deterministic mock addresses (until Aztec SDK is integrated)
-          // Using a simple hash of the secret key to create a unique address
-          const createMockAddress = (key: string) => {
-            // Simple hash function for deterministic addresses
-            let hash = 0;
-            for (let i = 0; i < key.length; i++) {
-              hash = ((hash << 5) - hash) + key.charCodeAt(i);
-              hash = hash & hash;
-            }
-            const hexHash = Math.abs(hash).toString(16).padStart(64, '0');
-            return `0x${hexHash}`;
-          };
+          if (!response.ok) {
+            throw new Error("Failed to fetch wallet addresses from API");
+          }
           
-          const sellerAddress = createMockAddress(sellerSecretKey);
-          const buyerAddress = createMockAddress(buyerSecretKey);
+          const result = await response.json();
           
-          console.log("Connected wallets:", { sellerAddress, buyerAddress });
+          if (!result.success || !result.data) {
+            throw new Error("Invalid response from addresses API");
+          }
+          
+          const { sellerAddress, buyerAddress } = result.data;
+          
+          console.log("Connected wallets (real Aztec addresses):", { sellerAddress, buyerAddress });
           
           const { role } = get();
           const currentAddress = role === "seller" ? sellerAddress : buyerAddress;

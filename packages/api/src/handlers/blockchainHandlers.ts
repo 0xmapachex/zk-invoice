@@ -262,13 +262,63 @@ export const createBlockchainHandlers = (database: IDatabase) => {
         );
       }
 
-      // For now, return a mock balance
-      // TODO: Implement actual balance fetching when needed
+      console.log(`\n=== BALANCE REQUEST ===`);
+      console.log(`Requested address: ${accountAddress}`);
+      console.log(`Token address: ${tokenAddress}`);
+
+      // Create node and wallet
+      const node = await createAztecNodeClient(L2_NODE_URL);
+      let pxeConfig: Partial<PXEConfig> = {};
+      if (await isTestnet(node)) {
+        pxeConfig = { rollupVersion: 1667575857, proverEnabled: false };
+      }
+
+      const { wallet, senderAddress, payerAddress } = await getInvoiceAccounts(node, pxeConfig);
+
+      console.log(`Seller address: ${senderAddress.toString()}`);
+      console.log(`Buyer address: ${payerAddress.toString()}`);
+
+      // Determine which address to check based on the accountAddress param
+      // Normalize comparison by converting to lowercase
+      const requestedAddr = accountAddress.toLowerCase();
+      const sellerAddr = senderAddress.toString().toLowerCase();
+      const buyerAddr = payerAddress.toString().toLowerCase();
+      
+      let addressToCheck: AztecAddress;
+      let role: string;
+      
+      if (requestedAddr === sellerAddr) {
+        addressToCheck = senderAddress;
+        role = "SELLER";
+      } else if (requestedAddr === buyerAddr) {
+        addressToCheck = payerAddress;
+        role = "BUYER";
+      } else {
+        console.log(`⚠️  Address mismatch! Using seller as fallback.`);
+        addressToCheck = senderAddress;
+        role = "SELLER (fallback)";
+      }
+
+      console.log(`Checking balance for: ${role}`);
+      console.log(`Using address: ${addressToCheck.toString()}`);
+
+      // Get token contract
+      const usdcAddress = AztecAddress.fromString(tokenAddress);
+      const { getTokenContract } = await import("../blockchain/contracts");
+      const token = await getTokenContract(wallet, addressToCheck, node, usdcAddress);
+
+      // Fetch actual private balance from blockchain
+      const balance = await token.methods
+        .balance_of_private(addressToCheck)
+        .simulate({ from: addressToCheck });
+
+      console.log(`✅ Balance for ${role}: ${balance.toString()}`);
+
       return new Response(
         JSON.stringify({
           success: true,
           data: {
-            balance: "10000000000", // 10,000 USDC with 6 decimals
+            balance: balance.toString(),
           },
         }),
         {
@@ -375,10 +425,69 @@ export const createBlockchainHandlers = (database: IDatabase) => {
     }
   };
 
+  /**
+   * Get wallet addresses
+   * GET /blockchain/addresses
+   */
+  const handleGetAddresses = async (req: Request): Promise<Response> => {
+    try {
+      // Get environment variables
+      const L2_NODE_URL = process.env.L2_NODE_URL;
+      if (!L2_NODE_URL) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: "L2_NODE_URL not configured in environment",
+          }),
+          {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      // Create node and wallet
+      const node = await createAztecNodeClient(L2_NODE_URL);
+      let pxeConfig: Partial<PXEConfig> = {};
+      if (await isTestnet(node)) {
+        pxeConfig = { rollupVersion: 1667575857, proverEnabled: false };
+      }
+
+      const { senderAddress, payerAddress } = await getInvoiceAccounts(node, pxeConfig);
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          data: {
+            sellerAddress: senderAddress.toString(),
+            buyerAddress: payerAddress.toString(),
+          },
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    } catch (error: any) {
+      console.error("Error getting addresses:", error);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: error.message || "Failed to get addresses",
+        }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+  };
+
   return {
     handleCreateInvoiceOnChain,
     handlePayInvoiceOnChain,
     handleGetBalance,
     handleMintTokens,
+    handleGetAddresses,
   };
 };
