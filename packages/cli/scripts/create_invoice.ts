@@ -121,15 +121,39 @@ const main = async () => {
     if (txReceipt) {
       await waitForBlockFinalization(node, txReceipt.blockNumber!, 2, 3000, 60, wallet, senderAddress);
     }
+  } else {
+    // On sandbox, wait a bit for public execution to complete
+    console.log("Waiting for public execution to complete...");
+    await new Promise(resolve => setTimeout(resolve, 2000));
   }
 
   // Fetch the partial note hash from the blockchain (stored in public storage)
+  // Retry a few times in case public execution hasn't completed yet
   console.log("Fetching payment info from blockchain...");
-  const paymentInfo = await registry.methods
-    .get_payment_info(invoiceId)
-    .simulate({ from: senderAddress });
+  let paymentInfo;
+  let retries = 5;
+  for (let i = 0; i < retries; i++) {
+    paymentInfo = await registry.methods
+      .get_payment_info(invoiceId)
+      .simulate({ from: senderAddress });
+    
+    if (paymentInfo.partial_note.toString() !== "0") {
+      break;
+    }
+    
+    if (i < retries - 1) {
+      console.log(`  Partial note not ready yet, waiting... (attempt ${i + 1}/${retries})`);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
+  
   const partialNoteHash = paymentInfo.partial_note.toString();
   console.log(`  Partial Note Hash: ${partialNoteHash}`);
+  
+  // Validate we got a proper partial note
+  if (partialNoteHash === "0" || partialNoteHash === "0x0") {
+    throw new Error("Failed to fetch partial note from blockchain - public storage not updated yet. Please try again.");
+  }
 
   // Register invoice in API
   console.log("Registering invoice in API...");

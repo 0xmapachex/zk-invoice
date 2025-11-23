@@ -29,6 +29,7 @@
     "invoice:pay": "bun run scripts/pay_invoice.ts",
     "invoice:check-db": "bun run scripts/check_invoice_db.ts",
     "invoice:get-onchain": "bun run scripts/get_invoice_onchain.ts",
-    "invoice:fix-partial-notes": "bun run scripts/fix_invoice_partial_notes.ts"
+    "invoice:fix-partial-notes": "bun run scripts/fix_invoice_partial_notes.ts",
+    "invoice:fix-db-partial-notes": "bun run scripts/fix_partial_notes.ts"
   }
 }

@@ -43,7 +43,7 @@ export function createInvoiceHandlers(database: IDatabase) {
         invoiceId,
         registryAddress,
         senderAddress: createInvoiceData.senderAddress,
-        partialNoteHash: "0x0",  // Will be set by contract, placeholder for now
+        partialNoteHash: rawData.partialNoteHash || "0x0",  // Use partial note from request
         title: createInvoiceData.title,
         tokenAddress: createInvoiceData.tokenAddress,
         amount: createInvoiceData.amount,
