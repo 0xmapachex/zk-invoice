@@ -84,7 +84,7 @@ const main = async () => {
 
   // Invoice details
   const invoiceTitle = "Payment for Services";
-  const invoiceAmount = USDC_SWAP_AMOUNT; // Requesting 1000 USDC
+  const invoiceAmount = USDC_SWAP_AMOUNT; // Requesting 100 USDC (1000 USDC / 10)
   const tokenAddress = usdcAddress; // Payment in USDC
 
   // For now, use random fields for metadata and title hash

@@ -23,38 +23,66 @@ const main = async () => {
   
   const server = Bun.serve({
     port: 3000,
-    fetch(req) {
+    async fetch(req) {
       const url = new URL(req.url);
+      
+      // CORS headers for browser requests
+      const corsHeaders = {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      };
+      
+      // Handle preflight OPTIONS requests
+      if (req.method === "OPTIONS") {
+        return new Response(null, { 
+          status: 204,
+          headers: corsHeaders 
+        });
+      }
+      
+      // Helper to add CORS headers to response
+      const addCorsHeaders = (response: Response) => {
+        const newHeaders = new Headers(response.headers);
+        Object.entries(corsHeaders).forEach(([key, value]) => {
+          newHeaders.set(key, value);
+        });
+        return new Response(response.body, {
+          status: response.status,
+          statusText: response.statusText,
+          headers: newHeaders,
+        });
+      };
       
       // /invoice endpoint - handles POST, GET
       if (url.pathname === "/invoice") {
         switch (req.method) {
           case "POST":
-            return handleCreateInvoice(req);
+            return addCorsHeaders(await handleCreateInvoice(req));
           case "GET":
-            return handleGetInvoice(req);
+            return addCorsHeaders(await handleGetInvoice(req));
           default:
-            return new Response("Method Not Allowed", { status: 405 });
+            return addCorsHeaders(new Response("Method Not Allowed", { status: 405 }));
         }
       }
 
       // /invoice/:id endpoint - handles PATCH for updating invoice
       if (url.pathname.startsWith("/invoice/") && url.pathname !== "/invoice/paid" && req.method === "PATCH") {
-        return handleUpdateInvoice(req);
+        return addCorsHeaders(await handleUpdateInvoice(req));
       }
 
       // /invoice/paid endpoint - marks invoice as paid
       if (url.pathname === "/invoice/paid" && req.method === "POST") {
-        return handleMarkPaid(req);
+        return addCorsHeaders(await handleMarkPaid(req));
       }
 
       // healthcheck endpoint
       if (req.method === "GET" && url.pathname === "/health") {
-        return new Response("OK", { status: 200 });
+        return addCorsHeaders(new Response("OK", { status: 200 }));
       }
 
       // Handle 404
-      return new Response("Not Found", { status: 404 });
+      return addCorsHeaders(new Response("Not Found", { status: 404 }));
     },
   });
 
